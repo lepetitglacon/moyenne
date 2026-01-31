@@ -1,27 +1,36 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { db, initDb } = require('./db');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const { db, initDb } = require("./db");
 
 const app = express();
-const PORT = 3000;
-const SECRET_KEY = 'votre_super_secret_key'; // En production, utilisez une variable d'environnement
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log("Listening on", port));
+const SECRET_KEY = "votre_super_secret_key";
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Initialize Database
 initDb();
 
-// Auth Middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+import cors from "cors";
 
+app.use(
+  cors({
+    origin: [
+      "https://pierrederache.fr",
+      "https://www.pierrederache.fr",
+    ],
+    credentials: true,
+  })
+);
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
   if (!token) return res.sendStatus(401);
 
   jwt.verify(token, SECRET_KEY, (err, user) => {
@@ -31,161 +40,338 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Routes
+// Helper: mois demandé via query ?month=YYYY-MM (sinon mois courant)
+function getMonthRange(monthParam) {
+  let y, m;
+
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    y = Number(monthParam.slice(0, 4));
+    m = Number(monthParam.slice(5, 7));
+  } else {
+    const now = new Date();
+    y = now.getFullYear();
+    m = now.getMonth() + 1;
+  }
+
+  const monthStart = `${y}-${String(m).padStart(2, "0")}-01`;
+
+  // 1er jour du mois suivant
+  const nextMonth = new Date(y, (m - 1) + 1, 1);
+  // dernier jour du mois courant
+  const monthEnd = new Date(nextMonth.getTime() - 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+
+  return { monthStart, monthEnd };
+}
 
 // Login
-app.post('/api/login', (req, res) => {
+app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password required' });
-  }
+  if (!username || !password)
+    return res.status(400).json({ message: "Username and password required" });
 
-  const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-  const user = stmt.get(username);
-
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
+  const user = db
+    .prepare("SELECT * FROM users WHERE username = ?")
+    .get(username);
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
   if (bcrypt.compareSync(password, user.password)) {
-    const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      SECRET_KEY,
+      { expiresIn: "2h" }
+    );
     res.json({ token });
   } else {
-    res.status(401).json({ message: 'Invalid credentials' });
+    res.status(401).json({ message: "Invalid credentials" });
   }
 });
 
-// Register (Optional, for easy testing)
-app.post('/api/register', (req, res) => {
+// Register
+app.post("/api/register", (req, res) => {
   const { username, password } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password required' });
-  }
+  if (!username || !password)
+    return res.status(400).json({ message: "Username and password required" });
+
+  const existingUser = db
+    .prepare("SELECT id FROM users WHERE username = ?")
+    .get(username);
+  if (existingUser)
+    return res.status(400).json({ message: "Username already taken" });
+
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare("INSERT INTO users (username, password) VALUES (?, ?)").run(
+    username,
+    hash
+  );
+
+  res.json({ message: "User created" });
+});
+
+// Add entry
+app.post("/api/entries", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { rating, description } = req.body;
+
+  const today = new Date().toISOString().split("T")[0];
 
   try {
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-    const info = stmt.run(username, hashedPassword);
-    res.status(201).json({ id: info.lastInsertRowid, username });
-  } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      res.status(400).json({ message: 'Username already exists' });
+    const existing = db
+      .prepare("SELECT id FROM entries WHERE user_id = ? AND date = ?")
+      .get(userId, today);
+
+    if (existing) {
+      db.prepare(
+        "UPDATE entries SET rating = ?, description = ? WHERE id = ?"
+      ).run(rating, description, existing.id);
     } else {
-      res.status(500).json({ message: 'Internal server error' });
+      db.prepare(
+        "INSERT INTO entries (user_id, date, rating, description) VALUES (?, ?, ?, ?)"
+      ).run(userId, today, rating, description);
     }
-  }
-});
 
-// Protected Route Example
-app.get('/api/protected', authenticateToken, (req, res) => {
-  res.json({ message: 'This is a protected data', user: req.user });
-});
-
-// --- ENTRIES ROUTES ---
-
-// Post/Update daily entry
-app.post('/api/entries', authenticateToken, (req, res) => {
-  console.log('Received entry POST:', req.body, 'User:', req.user.id);
-  const { rating, description } = req.body; // Date is now ignored from body
-  const userId = req.user.id;
-  // Always use server date for "today"
-  const entryDate = new Date().toISOString().split('T')[0];
-
-  if (rating === undefined || rating < 0 || rating > 10) {
-    console.log('Validation failed: rating', rating);
-    return res.status(400).json({ message: 'Rating must be between 0 and 10' });
-  }
-
-  try {
-    const stmt = db.prepare(`
-      INSERT INTO entries (user_id, date, rating, description)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(user_id, date) DO UPDATE SET
-      rating = excluded.rating,
-      description = excluded.description
-    `);
-    const result = stmt.run(userId, entryDate, rating, description);
-    console.log('Insert result:', result);
-    res.json({ message: 'Entry saved successfully', date: entryDate });
-  } catch (err) {
-    console.error('SQL Error:', err);
-    res.status(500).json({ message: 'Error saving entry' });
-  }
-});
-
-// Get today's entry
-app.get('/api/entries/today', authenticateToken, (req, res) => {
-  const userId = req.user.id;
-  const today = new Date().toISOString().split('T')[0];
-  try {
-    const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ?');
-    const entry = stmt.get(userId, today);
-    res.json(entry || null);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching today entry' });
-  }
-});
-
-// Get user history (last 14 days)
-app.get('/api/entries/history', authenticateToken, (req, res) => {
-  const userId = req.user.id;
-  try {
-    const stmt = db.prepare(`
-      SELECT * FROM entries 
-      WHERE user_id = ? 
-      ORDER BY date DESC 
-      LIMIT 14
-    `);
-    const entries = stmt.all(userId);
-    res.json(entries);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching history' });
-  }
-});
-
-// --- STATS ROUTES ---
-
-// Helper for stats queries
-const getStats = (userId = null) => {
-  const whereClause = userId ? 'WHERE user_id = ?' : '';
-  const params = userId ? [userId, userId, userId] : [];
-  
-  // SQLite modifiers for date
-  const sql = `
-    SELECT 
-      (SELECT AVG(rating) FROM entries ${whereClause}) as all_time,
-      (SELECT AVG(rating) FROM entries WHERE strftime('%Y-%W', date) = strftime('%Y-%W', 'now') ${userId ? 'AND user_id = ?' : ''}) as current_week,
-      (SELECT AVG(rating) FROM entries WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now') ${userId ? 'AND user_id = ?' : ''}) as current_month
-  `;
-  
-  const stmt = db.prepare(sql);
-  return stmt.get(...params);
-};
-
-// Public Stats (Global)
-app.get('/api/stats/public', (req, res) => {
-  try {
-    const stats = getStats(null); // No user filter
-    res.json(stats);
+    res.json({ message: "Saved" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Error fetching public stats' });
+    res.status(500).json({ message: "Error saving entry" });
   }
 });
 
-// Private Stats (Me)
-app.get('/api/stats/me', authenticateToken, (req, res) => {
+// Get next review
+app.get("/api/review/next", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const today = new Date().toISOString().split("T")[0];
+
   try {
-    const stats = getStats(req.user.id);
-    res.json(stats);
+    const entry = db
+      .prepare(
+        `
+      SELECT e.user_id, u.username, e.date, e.rating, e.description
+      FROM entries e
+      JOIN users u ON u.id = e.user_id
+      WHERE e.user_id != ?
+        AND e.date = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM ratings r
+          WHERE r.from_user_id = ?
+            AND r.to_user_id = e.user_id
+            AND r.date = e.date
+        )
+      ORDER BY RANDOM()
+      LIMIT 1
+    `
+      )
+      .get(userId, today, userId);
+
+    if (!entry) return res.json({ done: true });
+
+    res.json({
+      userId: entry.user_id,
+      username: entry.username,
+      date: entry.date,
+      rating: entry.rating,
+      description: entry.description,
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching user stats' });
+    console.error(err);
+    res.status(500).json({ message: "Error fetching next review" });
   }
 });
 
-// Start server
+// Add rating
+app.post("/api/ratings", authenticateToken, (req, res) => {
+  const fromUserId = req.user.id;
+  const { toUserId, date, rating } = req.body;
+
+  try {
+    db.prepare(
+      "INSERT INTO ratings (from_user_id, to_user_id, date, rating) VALUES (?, ?, ?, ?)"
+    ).run(fromUserId, toUserId, date, rating);
+
+    res.json({ message: "Rating saved" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error saving rating" });
+  }
+});
+
+// Liste des utilisateurs (pour explorer les stats)
+app.get("/api/users", authenticateToken, (req, res) => {
+  try {
+    const users = db
+      .prepare(
+        'SELECT id, username FROM users ORDER BY username COLLATE NOCASE ASC'
+      )
+      .all();
+    res.json({ users });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching users" });
+  }
+});
+
+// Get stats (me) : /api/me/stats?month=YYYY-MM
+app.get("/api/me/stats", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  const today = new Date().toISOString().split("T")[0];
+  const { monthStart, monthEnd } = getMonthRange(req.query.month);
+
+  try {
+    const lastEntry = db
+      .prepare(
+        `
+      SELECT date, rating, description
+      FROM entries
+      WHERE user_id = ?
+      ORDER BY date DESC
+      LIMIT 1
+    `
+      )
+      .get(userId);
+
+    const todayEntry = db
+      .prepare(
+        `
+      SELECT date, rating, description
+      FROM entries
+      WHERE user_id = ? AND date = ?
+      LIMIT 1
+    `
+      )
+      .get(userId, today);
+
+    const participation = db
+      .prepare(`SELECT COUNT(*) as count FROM entries WHERE user_id = ?`)
+      .get(userId);
+
+    const monthAvgRow = db
+      .prepare(
+        `
+      SELECT AVG(rating) as avg
+      FROM entries
+      WHERE user_id = ?
+        AND date >= ?
+        AND date <= ?
+    `
+      )
+      .get(userId, monthStart, monthEnd);
+
+    const monthEntries = db
+      .prepare(
+        `
+      SELECT date, rating
+      FROM entries
+      WHERE user_id = ?
+        AND date >= ?
+        AND date <= ?
+      ORDER BY date ASC
+    `
+      )
+      .all(userId, monthStart, monthEnd);
+
+    res.json({
+      today,
+      monthStart,
+      monthEnd,
+      lastEntry: lastEntry || null,
+      todayEntry: todayEntry || null,
+      participationCount: participation?.count ?? 0,
+      currentMonthAvg: monthAvgRow?.avg ?? null,
+      monthEntries,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching stats" });
+  }
+});
+
+// Stats d'un utilisateur (pour explorer les profils) : /api/users/:id/stats?month=YYYY-MM
+app.get("/api/users/:id/stats", authenticateToken, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) {
+    return res.status(400).json({ message: "Invalid user id" });
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const { monthStart, monthEnd } = getMonthRange(req.query.month);
+
+  try {
+    const user = db
+      .prepare("SELECT id, username FROM users WHERE id = ?")
+      .get(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const lastEntry = db
+      .prepare(
+        `
+      SELECT date, rating, description
+      FROM entries
+      WHERE user_id = ?
+      ORDER BY date DESC
+      LIMIT 1
+    `
+      )
+      .get(userId);
+
+    const todayEntry = db
+      .prepare(
+        `
+      SELECT date, rating, description
+      FROM entries
+      WHERE user_id = ? AND date = ?
+      LIMIT 1
+    `
+      )
+      .get(userId, today);
+
+    const participation = db
+      .prepare(`SELECT COUNT(*) as count FROM entries WHERE user_id = ?`)
+      .get(userId);
+
+    const monthAvgRow = db
+      .prepare(
+        `
+      SELECT AVG(rating) as avg
+      FROM entries
+      WHERE user_id = ?
+        AND date >= ?
+        AND date <= ?
+    `
+      )
+      .get(userId, monthStart, monthEnd);
+
+    const monthEntries = db
+      .prepare(
+        `
+      SELECT date, rating
+      FROM entries
+      WHERE user_id = ?
+        AND date >= ?
+        AND date <= ?
+      ORDER BY date ASC
+    `
+      )
+      .all(userId, monthStart, monthEnd);
+
+    res.json({
+      user,
+      today,
+      monthStart,
+      monthEnd,
+      lastEntry: lastEntry || null,
+      todayEntry: todayEntry || null,
+      participationCount: participation?.count ?? 0,
+      currentMonthAvg: monthAvgRow?.avg ?? null,
+      monthEntries,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching user stats" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
