@@ -6,7 +6,9 @@ const user = ref<any>(null) // In a real app, define an interface
 // Decode token simply to get username (or call /me endpoint)
 const decodeToken = (t: string) => {
   try {
-    const payload = JSON.parse(atob(t.split('.')[1]))
+    const parts = t.split('.')
+    if (parts.length < 2) return null
+    const payload = JSON.parse(atob(parts[1]))
     return payload
   } catch (e) {
     return null
