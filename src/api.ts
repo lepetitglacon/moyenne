@@ -1,5 +1,5 @@
 // src/api.ts
-export const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3000";
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE as string) || "http://localhost:3000/api";
 
 export function getToken(): string | null {
   return localStorage.getItem("tilt_token");
