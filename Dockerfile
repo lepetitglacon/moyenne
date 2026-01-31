@@ -9,6 +9,8 @@ COPY package*.json ./
 # Install frontend dependencies
 RUN npm ci
 
+ENV VITE_API_BASE=https://api.tilt.petitglacon.com
+
 # Copy frontend source code (sans server/)
 COPY public ./public
 COPY src ./src
