@@ -1,64 +1,55 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from "vue";
 
-const token = ref<string | null>(localStorage.getItem('token'))
-const user = ref<any>(null) // In a real app, define an interface
+const token = ref<string | null>(localStorage.getItem("tilt_token"));
 
-// Decode token simply to get username (or call /me endpoint)
-const decodeToken = (t: string) => {
-  try {
-    const payload = JSON.parse(atob(t.split('.')[1]))
-    return payload
-  } catch (e) {
-    return null
+// Base API venant du build Vite
+// Exemples :
+// - dev : "http://localhost:3000/api"
+// - prod : "/tilt/api" OU "https://api.domaine.tld/api"
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || "/api";
+
+function apiUrl(input: RequestInfo | URL): RequestInfo | URL {
+  if (typeof input !== "string") return input;
+
+  // Déjà absolu -> ne touche pas
+  if (input.startsWith("http://") || input.startsWith("https://")) return input;
+
+  // Si tu appelles "/api/xxx", on remappe vers API_BASE
+  if (input.startsWith("/api/")) {
+    return `${API_BASE}${input.slice("/api".length)}`; // "/api/login" -> "{API_BASE}/login"
   }
-}
 
-// Initial check
-if (token.value) {
-  user.value = decodeToken(token.value)
+  // Sinon, on laisse tel quel
+  return input;
 }
 
 export function useAuth() {
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!token.value);
 
-  const setToken = (t: string) => {
-    token.value = t
-    localStorage.setItem('token', t)
-    user.value = decodeToken(t)
+  function loginWithToken(t: string) {
+    token.value = t;
+    localStorage.setItem("tilt_token", t);
   }
 
-  const logout = () => {
-    token.value = null
-    user.value = null
-    localStorage.removeItem('token')
+  function logout() {
+    token.value = null;
+    localStorage.removeItem("tilt_token");
   }
 
-  // Generic fetch wrapper that adds auth header
-  const authFetch = async (url: string, options: RequestInit = {}) => {
-    if (!token.value) throw new Error('Not authenticated')
-    
-    const headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token.value}`,
-      'Content-Type': 'application/json'
-    }
+  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+    const headers = new Headers(init.headers || {});
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-    const response = await fetch(url, { ...options, headers })
-    
-    if (response.status === 401 || response.status === 403) {
-      logout()
-      throw new Error('Session expired')
-    }
-    
-    return response
+    if (token.value) headers.set("Authorization", `Bearer ${token.value}`);
+
+    return fetch(apiUrl(input), { ...init, headers });
   }
 
   return {
     token,
-    user,
     isAuthenticated,
-    setToken,
+    loginWithToken,
     logout,
-    authFetch
-  }
+    authFetch,
+  };
 }
