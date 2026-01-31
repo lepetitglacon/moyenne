@@ -1,9 +1,13 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const { db, initDb } = require("./db");
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { db, initDb } from "./db.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -15,8 +19,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 initDb();
-
-import cors from "cors";
 
 app.use(
   cors({
