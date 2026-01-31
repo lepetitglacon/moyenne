@@ -75,4 +75,4 @@ class Logger {
 // Export une instance par défaut et la classe
 const logger = new Logger("Server");
 
-module.exports = { Logger, logger };
+export { Logger, logger }
