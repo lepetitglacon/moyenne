@@ -92,4 +92,4 @@ function initDb() {
   }
 }
 
-module.exports = { db, initDb };
+export { db, initDb }
