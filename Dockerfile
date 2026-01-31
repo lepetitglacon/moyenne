@@ -9,35 +9,23 @@ COPY package*.json ./
 # Install frontend dependencies
 RUN npm ci
 
-# Copy frontend source code
-COPY . .
+# Copy frontend source code (sans server/)
+COPY public ./public
+COPY src ./src
+COPY index.html ./
+COPY vite.config.* ./
+COPY tsconfig.* ./
 
 # Build the frontend (outputs to /app/dist)
 RUN npm run build
 
-# --- Stage 2: Setup Backend & Runtime ---
-FROM node:20-alpine
+# --- Stage 2: Serve with nginx ---
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy built files to nginx
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 
-# Copy backend package files
-COPY server/package*.json ./
+# Expose port 80
+EXPOSE 80
 
-# Install backend dependencies (production only)
-RUN npm ci --only=production
-
-# Copy backend source code
-COPY server/ .
-
-# Copy built frontend assets from Stage 1 to the backend's public folder
-COPY --from=frontend-builder /app/dist ./public
-
-# Environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
-
-# Expose the port
-EXPOSE 3000
-
-# Start the server
-CMD ["node", "index.js"]
+CMD ["nginx", "-g", "daemon off;"]
