@@ -1,64 +1,36 @@
-import { ref, computed } from 'vue'
+import { computed, ref } from "vue";
 
-const token = ref<string | null>(localStorage.getItem('token'))
-const user = ref<any>(null) // In a real app, define an interface
-
-// Decode token simply to get username (or call /me endpoint)
-const decodeToken = (t: string) => {
-  try {
-    const payload = JSON.parse(atob(t.split('.')[1]))
-    return payload
-  } catch (e) {
-    return null
-  }
-}
-
-// Initial check
-if (token.value) {
-  user.value = decodeToken(token.value)
-}
+const token = ref<string | null>(localStorage.getItem("tilt_token"));
 
 export function useAuth() {
-  const isAuthenticated = computed(() => !!token.value)
+  const isAuthenticated = computed(() => !!token.value);
 
-  const setToken = (t: string) => {
-    token.value = t
-    localStorage.setItem('token', t)
-    user.value = decodeToken(t)
+  function loginWithToken(t: string) {
+    token.value = t;
+    localStorage.setItem("tilt_token", t);
   }
 
-  const logout = () => {
-    token.value = null
-    user.value = null
-    localStorage.removeItem('token')
+  function logout() {
+    token.value = null;
+    localStorage.removeItem("tilt_token");
   }
 
-  // Generic fetch wrapper that adds auth header
-  const authFetch = async (url: string, options: RequestInit = {}) => {
-    if (!token.value) throw new Error('Not authenticated')
-    
-    const headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token.value}`,
-      'Content-Type': 'application/json'
+  async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+    const headers = new Headers(init.headers || {});
+    headers.set("Content-Type", "application/json");
+
+    if (token.value) {
+      headers.set("Authorization", `Bearer ${token.value}`);
     }
 
-    const response = await fetch(url, { ...options, headers })
-    
-    if (response.status === 401 || response.status === 403) {
-      logout()
-      throw new Error('Session expired')
-    }
-    
-    return response
+    return fetch(input, { ...init, headers });
   }
 
   return {
     token,
-    user,
     isAuthenticated,
-    setToken,
+    loginWithToken,
     logout,
-    authFetch
-  }
+    authFetch,
+  };
 }
