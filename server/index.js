@@ -21,7 +21,7 @@ import cors from "cors";
 app.use(
   cors({
     origin: [
-      "https://pierrederache.fr",
+      process.env.FRONTEND_URL,
       "https://www.pierrederache.fr",
     ],
     credentials: true,
