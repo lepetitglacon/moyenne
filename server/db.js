@@ -1,7 +1,11 @@
-const Database = require("better-sqlite3");
-const path = require("path");
-const bcrypt = require("bcryptjs");
+import Database from "better-sqlite3"
+import path from "path"
+import bcrypt from "bcryptjs"
+import {fileURLToPath} from "url";
 
+
+export const __filename = fileURLToPath(import.meta.url);
+export const __dirname = path.dirname(__filename);
 const dbPath = path.join(__dirname, "database.sqlite");
 const db = new Database(dbPath);
 
