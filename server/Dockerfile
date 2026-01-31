@@ -3,13 +3,13 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy backend package files
-COPY server/package*.json ./
+COPY package*.json ./
 
 # Install backend dependencies (production only)
 RUN npm ci --only=production
 
 # Copy backend source code
-COPY server/ .
+COPY . .
 
 # Environment variables
 ENV NODE_ENV=production
