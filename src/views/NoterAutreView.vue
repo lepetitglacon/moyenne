@@ -57,7 +57,7 @@ onMounted(async () => {
   error.value = null;
 
   try {
-    const res = await authFetch("http://localhost:3000/api/review/next");
+    const res = await authFetch("/api/review/next");
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Impossible de récupérer quelqu’un à noter.");
@@ -82,7 +82,7 @@ async function next() {
   saving.value = true;
 
   try {
-    const res = await authFetch("http://localhost:3000/api/ratings", {
+    const res = await authFetch("/api/ratings", {
       method: "POST",
       body: JSON.stringify({
         toUserId: target.value.userId,

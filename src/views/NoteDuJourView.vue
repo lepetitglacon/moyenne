@@ -63,7 +63,7 @@ async function next() {
   saving.value = true;
 
   try {
-    const res = await authFetch("http://localhost:3000/api/entries", {
+    const res = await authFetch("/api/entries", {
       method: "POST",
       body: JSON.stringify({
         rating: dayScore.value,

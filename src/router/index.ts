@@ -9,7 +9,7 @@ import ProfileView from "../views/ProfileView.vue";
 import StatsView from "../views/StatsView.vue";
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: "/", redirect: "/login" },
     { path: "/login", name: "login", component: LoginView },
@@ -22,13 +22,13 @@ const router = createRouter({
   ],
 });
 
-// router.beforeEach((to) => {
-//   const { isAuthenticated } = useAuth();
+router.beforeEach((to) => {
+  const { isAuthenticated } = useAuth();
 
-//   if (to.meta.requiresAuth && !isAuthenticated.value) return { name: "login" };
-//   if (to.name === "login" && isAuthenticated.value) return { name: "note" };
+  if (to.meta.requiresAuth && !isAuthenticated.value) return { name: "login" };
+  if (to.name === "login" && isAuthenticated.value) return { name: "note" };
 
-//   return true;
-// });
+  return true;
+});
 
 export default router;

@@ -6,7 +6,8 @@ const bcrypt = require("bcryptjs");
 const { db, initDb } = require("./db");
 
 const app = express();
-const PORT = 3000;
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log("Listening on", port));
 const SECRET_KEY = "votre_super_secret_key";
 
 app.use(cors());
@@ -14,6 +15,18 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 initDb();
+
+import cors from "cors";
+
+app.use(
+  cors({
+    origin: [
+      "https://pierrederache.fr",
+      "https://www.pierrederache.fr",
+    ],
+    credentials: true,
+  })
+);
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
