@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import { useAuth } from "../composables/useAuth";
+import { API_BASE_URL } from "../api";
 
 const router = useRouter();
 const { loginWithToken } = useAuth();
@@ -27,7 +28,7 @@ async function onLogin() {
   loading.value = true;
 
   try {
-    const res = await fetch("/api/login", {
+    const res = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: email.value.trim(), password: password.value }),
@@ -64,7 +65,7 @@ async function onRegister() {
 
   try {
     // 1) création du compte
-    const res = await fetch("/api/register", {
+    const res = await fetch(`${API_BASE_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: email.value.trim(), password: password.value }),
