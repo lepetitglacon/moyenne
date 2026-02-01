@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 
 function goProfile() {
-  router.push("/profile");
+  router.push("/profil");
 }
 </script>
 

@@ -69,7 +69,7 @@ async function loadStatsFor(userId: string) {
 }
 
 function goProfile() {
-  router.push("/profile");
+  router.push("/profil");
 }
 
 function toggleUsers() {
