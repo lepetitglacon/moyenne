@@ -163,5 +163,26 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
         user: user || null,
       };
     },
+
+    /**
+     * Get leaderboard data
+     * @param {{ month?: string }} params
+     * @returns {{ monthly: Array, allTime: Array, topParticipants: Array, monthLabel: string }}
+     */
+    getLeaderboard({ month } = {}) {
+      const { monthStart, monthEnd } = getMonthRange(month);
+
+      const monthly = entryRepo.getLeaderboardByAvg(monthStart, monthEnd);
+      const allTime = entryRepo.getLeaderboardAllTime();
+      const topParticipants = entryRepo.getLeaderboardByParticipation();
+
+      return {
+        monthStart,
+        monthEnd,
+        monthly,
+        allTime,
+        topParticipants,
+      };
+    },
   };
 }

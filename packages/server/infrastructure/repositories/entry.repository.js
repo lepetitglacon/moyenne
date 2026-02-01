@@ -229,5 +229,68 @@ export function createEntryRepository(db) {
         `)
         .all(date);
     },
+
+    /**
+     * Get leaderboard by average rating for a date range
+     * @param {string} startDate - YYYY-MM-DD
+     * @param {string} endDate - YYYY-MM-DD
+     * @returns {{ userId: number, username: string, avgRating: number, entryCount: number }[]}
+     */
+    getLeaderboardByAvg(startDate, endDate) {
+      return db
+        .prepare(`
+          SELECT
+            e.user_id as userId,
+            u.username,
+            ROUND(AVG(e.rating), 1) as avgRating,
+            COUNT(*) as entryCount
+          FROM entries e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.date >= ? AND e.date <= ?
+          GROUP BY e.user_id
+          ORDER BY avgRating DESC, entryCount DESC
+        `)
+        .all(startDate, endDate);
+    },
+
+    /**
+     * Get all-time leaderboard by average rating
+     * @returns {{ userId: number, username: string, avgRating: number, entryCount: number }[]}
+     */
+    getLeaderboardAllTime() {
+      return db
+        .prepare(`
+          SELECT
+            e.user_id as userId,
+            u.username,
+            ROUND(AVG(e.rating), 1) as avgRating,
+            COUNT(*) as entryCount
+          FROM entries e
+          JOIN users u ON u.id = e.user_id
+          GROUP BY e.user_id
+          ORDER BY avgRating DESC, entryCount DESC
+        `)
+        .all();
+    },
+
+    /**
+     * Get leaderboard by participation count
+     * @returns {{ userId: number, username: string, entryCount: number, avgRating: number }[]}
+     */
+    getLeaderboardByParticipation() {
+      return db
+        .prepare(`
+          SELECT
+            e.user_id as userId,
+            u.username,
+            COUNT(*) as entryCount,
+            ROUND(AVG(e.rating), 1) as avgRating
+          FROM entries e
+          JOIN users u ON u.id = e.user_id
+          GROUP BY e.user_id
+          ORDER BY entryCount DESC, avgRating DESC
+        `)
+        .all();
+    },
   };
 }

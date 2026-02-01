@@ -46,5 +46,17 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
     }
   });
 
+  // Get leaderboard
+  router.get("/leaderboard", authenticateToken, (req, res, next) => {
+    try {
+      const leaderboard = statsService.getLeaderboard({
+        month: req.query.month,
+      });
+      res.json(leaderboard);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

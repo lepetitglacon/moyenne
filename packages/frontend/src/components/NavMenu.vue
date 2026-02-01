@@ -39,6 +39,14 @@ function handleLogout() {
       Stats
     </button>
     <button
+      class="nav-item"
+      :class="{ active: isActive('leaderboard') }"
+      type="button"
+      @click="go('leaderboard')"
+    >
+      Classement
+    </button>
+    <button
       class="nav-item nav-item--logout"
       type="button"
       @click="handleLogout"
