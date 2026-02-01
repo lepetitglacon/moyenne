@@ -5,7 +5,6 @@ import LoginView from "../views/LoginView.vue";
 import NoteDuJourView from "../views/NoteDuJourView.vue";
 import NoterAutreView from "../views/NoterAutreView.vue";
 import MerciView from "../views/MerciView.vue";
-import ProfileView from "../views/ProfileView.vue";
 import StatsView from "../views/StatsView.vue";
 
 const router = createRouter({
@@ -18,7 +17,6 @@ const router = createRouter({
     { path: "/noter-autre", name: "noterAutre", component: NoterAutreView, meta: { requiresAuth: true } },
     { path: "/merci", name: "merci", component: MerciView, meta: { requiresAuth: true } },
     { path: "/stats", name: "stats", component: StatsView, meta: { requiresAuth: true } },
-    { path: "/profil", name: "profil", component: ProfileView, meta: { requiresAuth: true } },
   ],
 });
 

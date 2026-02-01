@@ -1,12 +1,6 @@
 <script setup lang="ts">
-import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
-
-const router = useRouter();
-
-function goProfile() {
-  router.push("/stats");
-}
+import NavMenu from "../components/NavMenu.vue";
 </script>
 
 <template>
@@ -19,6 +13,8 @@ function goProfile() {
 <button class="btn btn-primary btn-wide" type="button" @click="$router.push({ name: 'stats' })">
   VOIR MES STATS
 </button>
+
+      <NavMenu />
     </div>
   </AppShell>
 </template>

@@ -3,7 +3,8 @@
  * Handles saving entries, getting reviews, saving ratings
  */
 
-import { getToday } from "../domain/index.js";
+import { getToday, getYesterday } from "../domain/index.js";
+import { ValidationError } from "../shared/index.js";
 
 /**
  * @typedef {Object} EntryDependencies
@@ -53,12 +54,13 @@ export function createEntryService({ entryRepo, ratingRepo, logger }) {
 
     /**
      * Get next entry to review for a user
+     * Returns entries from yesterday only (users rate previous day's entries)
      * @param {{ userId: number }} params
      * @returns {NextReviewResult}
      */
     getNextReview({ userId }) {
-      const today = getToday();
-      const entry = entryRepo.findNextReviewForUser(userId, today);
+      const yesterday = getYesterday();
+      const entry = entryRepo.findNextReviewForUser(userId, yesterday);
 
       if (!entry) {
         return { done: true };
@@ -76,9 +78,14 @@ export function createEntryService({ entryRepo, ratingRepo, logger }) {
 
     /**
      * Save a rating for another user's entry
+     * Only allows rating entries from yesterday
      * @param {{ fromUserId: number, toUserId: number, date: string, rating: number }} params
      */
     saveRating({ fromUserId, toUserId, date, rating }) {
+      const yesterday = getYesterday();
+      if (date !== yesterday) {
+        throw new ValidationError("Tu ne peux noter que les entrées de la veille");
+      }
       ratingRepo.create(fromUserId, toUserId, date, rating);
       logger?.info("Rating enregistré", { fromUserId, toUserId, date, rating });
     },

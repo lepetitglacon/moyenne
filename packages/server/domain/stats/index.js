@@ -6,6 +6,7 @@
 export {
   getMonthRange,
   getToday,
+  getYesterday,
   isValidDateFormat,
   isValidMonthFormat,
 } from "./date-range.js";

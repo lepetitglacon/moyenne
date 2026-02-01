@@ -77,8 +77,8 @@ async function loadStatsFor(t: "me" | number) {
   try {
     const base =
       t === "me"
-        ? "http://localhost:3000/api/me/stats"
-        : `http://localhost:3000/api/users/${t}/stats`;
+        ? "/api/me/stats"
+        : `/api/users/${t}/stats`;
 
     const month = selectedMonth.value ? `?month=${encodeURIComponent(selectedMonth.value)}` : "";
     const res = await authFetch(`${base}${month}`);

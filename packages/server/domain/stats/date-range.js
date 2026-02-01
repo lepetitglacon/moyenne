@@ -57,6 +57,17 @@ export function getToday(now = new Date()) {
 }
 
 /**
+ * Get yesterday's date in YYYY-MM-DD format
+ * @param {Date} [now] - Reference date (defaults to current date, injectable for testing)
+ * @returns {string}
+ */
+export function getYesterday(now = new Date()) {
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return formatDateLocal(yesterday);
+}
+
+/**
  * Check if a date string is valid YYYY-MM-DD format
  * @param {string} dateStr
  * @returns {boolean}

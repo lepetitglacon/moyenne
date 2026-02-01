@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
+import NavMenu from "../components/NavMenu.vue";
 import { useFlow } from "../composables/useFlow";
 import { useAuth } from "../composables/useAuth";
 
@@ -119,6 +120,8 @@ async function next() {
       </button>
 
       <p v-if="error" class="form-error">{{ error }}</p>
+
+      <NavMenu />
     </div>
   </AppShell>
 </template>

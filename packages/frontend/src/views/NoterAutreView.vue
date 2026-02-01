@@ -60,9 +60,17 @@ onMounted(async () => {
     const res = await authFetch("/api/review/next");
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data?.message || "Impossible de récupérer quelqu’un à noter.");
+      throw new Error(data?.message || "Impossible de récupérer quelqu'un à noter.");
     }
-    target.value = await res.json(); // null si personne
+    const data = await res.json();
+
+    // Si done: true ou pas de données, redirection directe vers merci
+    if (data?.done || !data?.userId) {
+      router.replace({ name: "merci" });
+      return;
+    }
+
+    target.value = data;
   } catch (e: any) {
     error.value = e?.message ?? "Erreur réseau.";
   } finally {
@@ -126,16 +134,7 @@ function reload() {
         </button>
       </template>
 
-      <template v-else-if="!target">
-        <div class="step-subtitle">Personne à noter</div>
-        <div class="step-value">Personne n’a posté (ou tu as déjà noté tout le monde).</div>
-
-        <button class="btn btn-primary btn-wide" type="button" @click="next">
-          CONTINUER
-        </button>
-      </template>
-
-      <template v-else>
+      <template v-else-if="target">
         <div class="step-subtitle">Commentaire de {{ target.username }}</div>
 
         <div class="textarea readonly">
