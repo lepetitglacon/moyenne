@@ -22,6 +22,7 @@ describe("Stats Service", () => {
       countByUser: vi.fn(),
       getAvgByUserAndRange: vi.fn(),
       listByUserAndRange: vi.fn(),
+      listAllByUser: vi.fn(),
       listByDateWithUsers: vi.fn(),
     };
 
@@ -61,6 +62,11 @@ describe("Stats Service", () => {
         { date: "2024-01-10", rating: 14 },
         { date: "2024-01-15", rating: 15 },
       ]);
+      mockEntryRepo.listAllByUser.mockReturnValue([
+        { date: "2024-01-10" },
+        { date: "2024-01-14" },
+        { date: "2024-01-15" },
+      ]);
 
       const result = statsService.getMyStats({ userId: 1, month: "2024-01" });
 
@@ -71,6 +77,9 @@ describe("Stats Service", () => {
       expect(result.participationCount).toBe(10);
       expect(result.currentMonthAvg).toBe(14.5);
       expect(result.monthEntries).toHaveLength(2);
+      expect(result.streak).toBeDefined();
+      expect(result.streak.currentStreak).toBeGreaterThanOrEqual(0);
+      expect(result.streak.longestStreak).toBeGreaterThanOrEqual(0);
     });
 
     it("should handle null entries", () => {
@@ -79,6 +88,7 @@ describe("Stats Service", () => {
       mockEntryRepo.countByUser.mockReturnValue(0);
       mockEntryRepo.getAvgByUserAndRange.mockReturnValue(null);
       mockEntryRepo.listByUserAndRange.mockReturnValue([]);
+      mockEntryRepo.listAllByUser.mockReturnValue([]);
 
       const result = statsService.getMyStats({ userId: 1 });
 
@@ -87,6 +97,8 @@ describe("Stats Service", () => {
       expect(result.participationCount).toBe(0);
       expect(result.currentMonthAvg).toBeNull();
       expect(result.monthEntries).toEqual([]);
+      expect(result.streak.currentStreak).toBe(0);
+      expect(result.streak.longestStreak).toBe(0);
     });
   });
 
@@ -98,12 +110,14 @@ describe("Stats Service", () => {
       mockEntryRepo.countByUser.mockReturnValue(5);
       mockEntryRepo.getAvgByUserAndRange.mockReturnValue(12.0);
       mockEntryRepo.listByUserAndRange.mockReturnValue([]);
+      mockEntryRepo.listAllByUser.mockReturnValue([]);
 
       const result = statsService.getUserStats({ userId: 2, month: "2024-01" });
 
       expect(result.user.id).toBe(2);
       expect(result.user.username).toBe("otheruser");
       expect(result.participationCount).toBe(5);
+      expect(result.streak).toBeDefined();
     });
 
     it("should throw NotFoundError for non-existent user", () => {

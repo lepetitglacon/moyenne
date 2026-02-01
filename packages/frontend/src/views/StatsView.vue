@@ -10,6 +10,11 @@ const { authFetch } = useAuth();
 
 type MonthEntry = { date: string; rating: number };
 
+type StreakInfo = {
+  currentStreak: number;
+  longestStreak: number;
+};
+
 type StatsPayload = {
   today: string;
   monthStart: string;
@@ -19,6 +24,7 @@ type StatsPayload = {
   participationCount: number;
   currentMonthAvg: number | null;
   monthEntries: MonthEntry[];
+  streak: StreakInfo;
 };
 
 type UserLite = { id: number; username: string };
@@ -114,9 +120,9 @@ onMounted(async () => {
   await loadStatsFor("me");
 });
 
-function parseYMD(ymd: string) {
-  const [yy, mm, dd] = ymd.split("-").map((v) => Number(v));
-  return new Date(yy, mm - 1, dd);
+function parseYMD(ymd: string): Date {
+  const parts = ymd.split("-").map((v) => Number(v)) as [number, number, number];
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 const monthLabel = computed(() => {
@@ -229,19 +235,22 @@ function goEditToday() {
       <template v-else-if="stats">
         <div class="stats-content">
           <div class="stats-cards">
-            <div class="card">
-              <div class="card-label">Dernière note</div>
-              <div class="card-value">
-                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }}<small>/20</small></span>
-                <span v-else>—</span>
+            <div class="card card--streak">
+              <div class="card-label">Streak actuel</div>
+              <div class="card-value streak-value">
+                {{ stats.streak?.currentStreak ?? 0 }}
+                <span class="streak-icon">🔥</span>
               </div>
-              <div class="card-sub" v-if="stats.lastEntry">{{ stats.lastEntry.date }}</div>
+              <div class="card-sub">jours consécutifs</div>
             </div>
 
-            <div class="card">
-              <div class="card-label">Participations</div>
-              <div class="card-value">{{ stats.participationCount }}</div>
-              <div class="card-sub">jours notés</div>
+            <div class="card card--record">
+              <div class="card-label">Record</div>
+              <div class="card-value">
+                {{ stats.streak?.longestStreak ?? 0 }}
+                <span class="record-icon">🏆</span>
+              </div>
+              <div class="card-sub">meilleur streak</div>
             </div>
 
             <div class="card">
@@ -251,6 +260,21 @@ function goEditToday() {
                 <span v-else>—</span>
               </div>
               <div class="card-sub">{{ monthLabel }}</div>
+            </div>
+
+            <div class="card">
+              <div class="card-label">Participations</div>
+              <div class="card-value">{{ stats.participationCount }}</div>
+              <div class="card-sub">jours notés</div>
+            </div>
+
+            <div class="card">
+              <div class="card-label">Dernière note</div>
+              <div class="card-value">
+                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }}<small>/20</small></span>
+                <span v-else>—</span>
+              </div>
+              <div class="card-sub" v-if="stats.lastEntry">{{ stats.lastEntry.date }}</div>
             </div>
           </div>
 
@@ -393,38 +417,61 @@ function goEditToday() {
 
 .stats-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
 }
 
 .card {
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.1);
   text-align: center;
 }
 
+.card--streak {
+  background: linear-gradient(135deg, rgba(255,100,50,.12) 0%, rgba(255,180,50,.08) 100%);
+  border-color: rgba(255,140,50,.25);
+}
+
+.card--record {
+  background: linear-gradient(135deg, rgba(255,200,50,.1) 0%, rgba(255,220,100,.06) 100%);
+  border-color: rgba(255,200,50,.2);
+}
+
 .card-label {
-  font-size: 12px;
+  font-size: 11px;
   opacity: .65;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .card-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .card-value small {
-  font-size: 14px;
+  font-size: 12px;
   opacity: .7;
 }
 
+.streak-value {
+  color: rgba(255,180,100,.95);
+}
+
+.streak-icon,
+.record-icon {
+  font-size: 18px;
+}
+
 .card-sub {
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: 3px;
+  font-size: 10px;
   opacity: .5;
 }
 
@@ -544,9 +591,54 @@ function goEditToday() {
   margin-top: 8px;
 }
 
-@media (max-width: 768px) {
+.profile-select {
+  appearance: none;
+  height: 36px;
+  padding: 0 36px 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+
+  /* dark theme */
+  background: rgba(20, 22, 40, .95);
+  color: rgba(255,255,255,.92);
+  color-scheme: dark;
+
+  font-weight: 700;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.profile-select:hover {
+  background: rgba(35, 38, 70, .95);
+}
+
+.profile-select:focus {
+  border-color: rgba(255,255,255,.22);
+  box-shadow: 0 0 0 3px rgba(180, 120, 255, .18);
+}
+
+/* Dropdown items (souvent le point “blanc sur blanc”) */
+.profile-select option {
+  background-color: rgb(20, 22, 40);
+  color: rgba(255,255,255,.92);
+}
+
+/* Option sélectionnée / survol (support variable selon OS/navigateur) */
+.profile-select option:checked {
+  background-color: rgb(35, 38, 70);
+  color: rgba(255,255,255,.95);
+}
+
+@media (max-width: 900px) {
   .stats-cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .stats-header {
@@ -560,7 +652,12 @@ function goEditToday() {
   }
 
   .card-value {
-    font-size: 22px;
+    font-size: 20px;
+  }
+
+  .streak-icon,
+  .record-icon {
+    font-size: 14px;
   }
 }
 </style>

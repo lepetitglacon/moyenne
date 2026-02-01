@@ -17,3 +17,5 @@ export {
   calculateRecapStats,
   normalizeDbAverage,
 } from "./stats-calculator.js";
+
+export { calculateStreak } from "./streak-calculator.js";
