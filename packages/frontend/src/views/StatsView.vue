@@ -284,12 +284,6 @@ function goEditToday() {
               <span class="cal-month">{{ monthLabel }}</span>
               <button class="cal-nav" type="button" @click="nextMonth" aria-label="Mois suivant">›</button>
 
-              <div class="cal-legend">
-                <span class="legend-dot" style="background: rgb(220,60,70)"></span>
-                <span class="legend-label">0</span>
-                <span class="legend-dot" style="background: rgb(40,200,90)"></span>
-                <span class="legend-label">20</span>
-              </div>
             </div>
 
             <div class="calendar-weekdays">
