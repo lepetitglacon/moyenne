@@ -14,85 +14,95 @@ type StatsPayload = {
   monthStart: string;
   monthEnd: string;
   lastEntry: null | { date: string; rating: number; description: string };
-  todayEntry:
-    | null
-    | { date: string; rating: number; description: string; createdAt?: string };
-  monthAvg: number;
-  monthCount: number;
+  todayEntry: null | { date: string; rating: number; description: string };
+  participationCount: number;
+  currentMonthAvg: number | null;
   monthEntries: MonthEntry[];
 };
 
-type UserLite = { id: string; username: string };
+type UserLite = { id: number; username: string };
+type UserStatsPayload = StatsPayload & { user?: UserLite };
 
-const loading = ref(false);
-const error = ref("");
+const loading = ref(true);
+const error = ref<string | null>(null);
 
-const stats = ref<StatsPayload | null>(null);
-
+const usersLoading = ref(true);
+const usersError = ref<string | null>(null);
 const users = ref<UserLite[]>([]);
-const target = ref<string>("me");
 
+const stats = ref<UserStatsPayload | null>(null);
+
+// cible sélectionnée : "me" ou userId
+const target = ref<"me" | number>("me");
+
+// mois sélectionné : "YYYY-MM"
 const selectedMonth = ref<string>("");
 
-const showUsers = ref(false);
-
+// -------- API --------
 async function loadUsers() {
-  error.value = "";
+  usersLoading.value = true;
+  usersError.value = null;
+
   try {
     const res = await authFetch("/api/users");
-    if (!res.ok) throw new Error("Impossible de charger la liste des utilisateurs");
-    users.value = (await res.json()) as UserLite[];
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Impossible de charger la liste des utilisateurs.");
+    users.value = Array.isArray(data?.users) ? (data.users as UserLite[]) : [];
   } catch (e: any) {
-    error.value = e?.message || "Erreur inconnue";
+    usersError.value = e?.message ?? "Erreur réseau (users).";
+  } finally {
+    usersLoading.value = false;
   }
 }
 
-async function loadStatsFor(userId: string) {
-  loading.value = true;
-  error.value = "";
-  try {
-    const monthParam = selectedMonth.value ? `&month=${encodeURIComponent(selectedMonth.value)}` : "";
-    const res = await authFetch(`/api/stats?user=${encodeURIComponent(userId)}${monthParam}`);
-    if (!res.ok) throw new Error("Impossible de charger les statistiques");
-    const payload = (await res.json()) as StatsPayload;
-    stats.value = payload;
+function monthFromDateYMD(ymd: string) {
+  return ymd?.slice(0, 7) || "";
+}
 
-    // si aucune sélection, on se cale sur le mois retourné
-    if (!selectedMonth.value && payload?.monthStart) {
-      selectedMonth.value = payload.monthStart.slice(0, 7); // "YYYY-MM"
+function shiftMonth(ym: string, delta: number) {
+  const [yStr, mStr] = ym.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = new Date(y, m - 1, 1);
+  d.setMonth(d.getMonth() + delta);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${yy}-${mm}`;
+}
+
+async function loadStatsFor(t: "me" | number) {
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const base =
+      t === "me"
+        ? "http://localhost:3000/api/me/stats"
+        : `http://localhost:3000/api/users/${t}/stats`;
+
+    const month = selectedMonth.value ? `?month=${encodeURIComponent(selectedMonth.value)}` : "";
+    const res = await authFetch(`${base}${month}`);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Impossible de charger les stats.");
+
+    stats.value = data as UserStatsPayload;
+
+    // initialise selectedMonth au premier chargement
+    if (!selectedMonth.value && stats.value?.monthStart) {
+      selectedMonth.value = monthFromDateYMD(stats.value.monthStart);
     }
   } catch (e: any) {
-    error.value = e?.message || "Erreur inconnue";
+    error.value = e?.message ?? "Erreur réseau.";
   } finally {
     loading.value = false;
   }
 }
 
-function goProfile() {
-  router.push("/profile");
-}
-
-function toggleUsers() {
-  showUsers.value = !showUsers.value;
-}
-
-function selectUser(id: string) {
-  target.value = id;
-  showUsers.value = false;
+function onTargetChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value;
+  target.value = v === "me" ? "me" : Number(v);
   loadStatsFor(target.value);
-}
-
-function shiftMonth(yyyyMM: string, delta: number) {
-  const m = yyyyMM.match(/^([0-9]{4})-([0-9]{2})$/);
-  if (!m) return yyyyMM;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  if (!Number.isFinite(y) || !Number.isFinite(mo)) return yyyyMM;
-
-  const d = new Date(y, mo - 1 + delta, 1);
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${yy}-${mm}`;
 }
 
 function prevMonth() {
@@ -113,16 +123,8 @@ onMounted(async () => {
 });
 
 // -------- Helpers calendrier --------
-function parseYMD(ymd: string): Date {
-  // Format attendu: YYYY-MM-DD
-  const m = ymd.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
-  if (!m) return new Date(NaN);
-
-  const yy = Number(m[1]);
-  const mm = Number(m[2]);
-  const dd = Number(m[3]);
-
-  if (!Number.isFinite(yy) || !Number.isFinite(mm) || !Number.isFinite(dd)) return new Date(NaN);
+function parseYMD(ymd: string) {
+  const [yy, mm, dd] = ymd.split("-").map((v) => Number(v));
   return new Date(yy, mm - 1, dd);
 }
 
@@ -149,407 +151,422 @@ const firstDayOffset = computed(() => {
 
 const entriesMap = computed(() => {
   const map = new Map<string, number>();
-  if (!stats.value) return map;
-  for (const e of stats.value.monthEntries || []) map.set(e.date, e.rating);
+
+  (stats.value?.monthEntries || []).forEach((e) => map.set(e.date, e.rating));
+
+  if (stats.value?.todayEntry) {
+    map.set(stats.value.todayEntry.date, stats.value.todayEntry.rating);
+  }
+
   return map;
 });
 
 function dayKey(day: number) {
   if (!stats.value) return "";
-  const d = parseYMD(stats.value.monthStart);
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(day).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
+  const start = parseYMD(stats.value.monthStart);
+  const y = start.getFullYear();
+  const m = String(start.getMonth() + 1).padStart(2, "0");
+  const d = String(day).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// rouge -> vert
+function ratingToColor(rating: number) {
+  const t = Math.max(0, Math.min(20, rating)) / 20;
+  const r = Math.round(220 * (1 - t) + 40 * t);
+  const g = Math.round(60 * (1 - t) + 200 * t);
+  const b = Math.round(70 * (1 - t) + 90 * t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function cellStyle(day: number) {
   const key = dayKey(day);
-  const v = entriesMap.value.get(key);
+  const rating = entriesMap.value.get(key);
 
-  // pas de note
-  if (v === undefined) return {};
-
-  // 0..20 -> teintes (reprend la logique "style du site" via classes + opacité)
-  const ratio = Math.max(0, Math.min(1, v / 20));
-  const alpha = 0.15 + ratio * 0.65;
+  if (rating === undefined) {
+    return {
+      background: "rgba(255,255,255,.06)",
+      border: "1px solid rgba(255,255,255,.08)",
+    };
+  }
 
   return {
-    background: `rgba(255, 255, 255, ${alpha})`,
-    borderColor: `rgba(255, 255, 255, ${Math.min(0.9, alpha + 0.15)})`,
+    background: ratingToColor(rating),
+    border: "1px solid rgba(255,255,255,.14)",
   };
 }
 
-const todayKey = computed(() => stats.value?.today || "");
-
-function isToday(day: number) {
+function dayTitle(day: number) {
   const key = dayKey(day);
-  return key === todayKey.value;
+  const rating = entriesMap.value.get(key);
+  if (rating === undefined) return "Pas de note";
+  return `${rating}/20`;
 }
 
-function ratingLabel(v: number) {
-  return `${v}/20`;
+const headerTitle = computed(() => {
+  if (target.value === "me") return "Statistiques — moi";
+  const u = users.value.find((x) => x.id === target.value);
+  return u ? `Statistiques — ${u.username}` : "Statistiques";
+});
+
+function goEditToday() {
+  router.push({ name: "note" });
 }
 </script>
 
 <template>
   <AppShell variant="center" :showDecor="false">
     <div class="page-center">
-      <div class="header">
-        <div class="title">Stats</div>
+      <img class="brand-logo" src="../assets/img/tilt.png" alt="tilt" />
 
-        <div class="actions">
-          <button class="btn btn-ghost" type="button" @click="toggleUsers">
-            Profils
-          </button>
-          <button class="btn btn-ghost" type="button" @click="goProfile">
-            Profil
-          </button>
+      <div class="panel panel--narrow">
+        <div class="step-title">{{ headerTitle }}</div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <div v-if="usersLoading" class="step-subtitle">Chargement des utilisateurs…</div>
+          <p v-else-if="usersError" class="form-error">{{ usersError }}</p>
+
+          <div v-else class="profile-switch">
+            <span class="profile-switch__label">Explorer un profil</span>
+
+            <div class="profile-switch__control">
+              <select
+                class="profile-switch__select"
+                :value="target === 'me' ? 'me' : String(target)"
+                @change="onTargetChange"
+              >
+                <option value="me">Moi</option>
+                <option v-for="u in users" :key="u.id" :value="String(u.id)">
+                  {{ u.username }}
+                </option>
+              </select>
+
+              <span class="profile-switch__chevron" aria-hidden="true">▾</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div v-if="loading" class="step-subtitle">Chargement…</div>
-      <div v-else-if="error" class="step-subtitle error">{{ error }}</div>
+        <template v-if="loading">
+          <div class="step-subtitle">Chargement…</div>
+        </template>
 
-      <template v-else>
-        <div class="panel">
-          <div class="panel-head">
-            <button class="nav-arrow" type="button" @click="prevMonth" aria-label="Mois précédent">
-              ‹
-            </button>
+        <template v-else-if="error">
+          <p class="form-error">{{ error }}</p>
+        </template>
 
-            <div class="month">{{ monthLabel }}</div>
+        <template v-else-if="stats">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Dernière note</div>
+              <div class="stat-value">
+                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }} / 20</span>
+                <span v-else>—</span>
+              </div>
+              <div class="stat-sub" v-if="stats.lastEntry">({{ stats.lastEntry.date }})</div>
+            </div>
 
-            <button class="nav-arrow" type="button" @click="nextMonth" aria-label="Mois suivant">
-              ›
-            </button>
+            <div class="stat-card">
+              <div class="stat-label">Participations</div>
+              <div class="stat-value">{{ stats.participationCount }}</div>
+              <div class="stat-sub">jours notés</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Moyenne du mois</div>
+              <div class="stat-value">
+                <span v-if="stats.currentMonthAvg !== null">{{ stats.currentMonthAvg.toFixed(1) }} / 20</span>
+                <span v-else>—</span>
+              </div>
+              <div class="stat-sub">{{ monthLabel }}</div>
+            </div>
           </div>
 
-          <div class="kpis">
-            <div class="kpi">
-              <div class="kpi-label">Moyenne</div>
-              <div class="kpi-value">{{ stats?.monthAvg?.toFixed(2) }}</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Entrées</div>
-              <div class="kpi-value">{{ stats?.monthCount }}</div>
-            </div>
-          </div>
+          <button
+            v-if="target === 'me'"
+            class="btn btn-primary btn-wide"
+            type="button"
+            @click="goEditToday"
+          >
+            MODIFIER MA NOTE DU JOUR
+          </button>
 
           <div class="calendar">
-            <div class="dow">L</div>
-            <div class="dow">M</div>
-            <div class="dow">M</div>
-            <div class="dow">J</div>
-            <div class="dow">V</div>
-            <div class="dow">S</div>
-            <div class="dow">D</div>
+            <div class="calendar-header">
+              <div class="calendar-nav">
+                <button class="nav-btn" type="button" @click="prevMonth" aria-label="Mois précédent">
+                  ‹
+                </button>
 
-            <div
-              v-for="i in firstDayOffset"
-              :key="'pad-' + i"
-              class="day pad"
-            />
+                <div class="step-subtitle">Calendrier — {{ monthLabel }}</div>
 
-            <div
-              v-for="d in monthDays"
-              :key="'day-' + d"
-              class="day"
-              :class="{ today: isToday(d), filled: entriesMap.get(dayKey(d)) !== undefined }"
-              :style="cellStyle(d)"
-              :title="entriesMap.get(dayKey(d)) !== undefined ? ratingLabel(entriesMap.get(dayKey(d))!) : 'Pas de note'"
-            >
-              <div class="day-number">{{ d }}</div>
-              <div v-if="entriesMap.get(dayKey(d)) !== undefined" class="day-score">
-                {{ entriesMap.get(dayKey(d)) }}/20
+                <button class="nav-btn" type="button" @click="nextMonth" aria-label="Mois suivant">
+                  ›
+                </button>
+              </div>
+
+              <div class="calendar-legend">
+                <span class="dot" style="background: rgb(220,60,70)"></span>
+                <span class="legend-text">0</span>
+                <span class="dot" style="background: rgb(40,200,90)"></span>
+                <span class="legend-text">20</span>
+              </div>
+            </div>
+
+            <div class="calendar-weekdays">
+              <div class="weekday">L</div>
+              <div class="weekday">M</div>
+              <div class="weekday">M</div>
+              <div class="weekday">J</div>
+              <div class="weekday">V</div>
+              <div class="weekday">S</div>
+              <div class="weekday">D</div>
+            </div>
+
+            <div class="calendar-grid">
+              <div v-for="i in firstDayOffset" :key="'empty-' + i" class="day empty"></div>
+
+              <div
+                v-for="d in monthDays"
+                :key="'day-' + d"
+                class="day"
+                :style="cellStyle(d)"
+                :title="dayTitle(d)"
+              >
+                <div class="day-number">{{ d }}</div>
+                <div class="day-rating" v-if="entriesMap.get(dayKey(d)) !== undefined">
+                  {{ entriesMap.get(dayKey(d)) }}
+                </div>
               </div>
             </div>
           </div>
-
-          <div v-if="stats?.lastEntry" class="last">
-            <div class="last-title">Dernière entrée</div>
-            <div class="last-row">
-              <div class="last-date">{{ stats.lastEntry.date }}</div>
-              <div class="last-rating">{{ stats.lastEntry.rating }}/20</div>
-            </div>
-            <div class="last-desc">{{ stats.lastEntry.description }}</div>
-          </div>
-        </div>
-
-        <div v-if="showUsers" class="users">
-          <div class="users-title">Choisir un profil</div>
-
-          <button
-            class="user"
-            type="button"
-            :class="{ active: target === 'me' }"
-            @click="selectUser('me')"
-          >
-            <span class="user-name">Moi</span>
-          </button>
-
-          <button
-            v-for="u in users"
-            :key="u.id"
-            class="user"
-            type="button"
-            :class="{ active: target === u.id }"
-            @click="selectUser(u.id)"
-          >
-            <span class="user-name">{{ u.username }}</span>
-          </button>
-        </div>
-      </template>
+        </template>
+      </div>
     </div>
   </AppShell>
 </template>
 
 <style scoped>
-.page-center {
-  width: min(980px, 100%);
-  margin: 0 auto;
-  padding: 18px 16px 24px;
-}
-
-.header {
+/* ---- Switch profil ---- */
+.profile-switch{
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+}
+
+.profile-switch__label{
+  font-size: 14px;
+  font-weight: 700;
+  opacity: .9;
+}
+
+.profile-switch__control{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.profile-switch__select{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  height: 40px;
+  padding: 0 42px 0 14px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.92);
+
+  font-weight: 800;
+  letter-spacing: .1px;
+
+  outline: none;
+  cursor: pointer;
+
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+
+  /* évite le dropdown blanc sur blanc */
+  color-scheme: dark;
+}
+
+.profile-switch__select:hover{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.16);
+}
+
+.profile-switch__select:focus{
+  border-color: rgba(255,255,255,.22);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.08);
+}
+
+.profile-switch__select option{
+  background: #0b1020;
+  color: rgba(255,255,255,.92);
+}
+
+.profile-switch__select option:checked{
+  background: #111827;
+  color: rgba(255,255,255,.95);
+}
+
+.profile-switch__chevron{
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+  opacity: .75;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ---- Stats ---- */
+.stats-grid{
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
+  margin-top: 12px;
   margin-bottom: 14px;
 }
 
-.title {
+.stat-card{
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.stat-label{
+  font-size: 12px;
+  opacity: .7;
+  margin-bottom: 6px;
+}
+
+.stat-value{
   font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  font-weight: 900;
+  letter-spacing: .2px;
 }
 
-.actions {
+.stat-sub{
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: .55;
+}
+
+/* ---- Calendar ---- */
+.calendar{
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.calendar-header{
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.step-subtitle {
-  opacity: 0.9;
-  font-weight: 600;
-  margin: 8px 0 12px;
-}
-
-.error {
-  color: rgba(255, 120, 120, 0.95);
-}
-
-.panel {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(10px);
-}
-
-.panel-head {
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
+.calendar-nav{
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
 }
 
-.month {
-  text-align: center;
-  font-weight: 800;
-  text-transform: capitalize;
-  letter-spacing: 0.3px;
-}
-
-.nav-arrow {
-  height: 38px;
-  width: 38px;
+.nav-btn{
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
 
-.nav-arrow:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.92);
 
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 10px 0 14px;
-}
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-.kpi {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
-
-.kpi-label {
-  opacity: 0.8;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.2px;
-}
-
-.kpi-value {
-  margin-top: 4px;
   font-size: 18px;
   font-weight: 900;
+
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .06s ease;
 }
 
-.calendar {
+.nav-btn:hover{
+  background: rgba(255,255,255,.09);
+  border-color: rgba(255,255,255,.16);
+}
+
+.nav-btn:active{
+  transform: translateY(1px);
+}
+
+.nav-btn:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.08);
+}
+
+.calendar-legend{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: .8;
+}
+
+.dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.legend-text{
+  font-size: 12px;
+  opacity: .8;
+}
+
+.calendar-weekdays{
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  opacity: .7;
+  font-size: 12px;
+  text-align: center;
+}
+
+.calendar-grid{
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
 }
 
-.dow {
-  text-align: center;
-  opacity: 0.7;
-  font-weight: 800;
-  font-size: 12px;
-  padding: 4px 0 2px;
-}
-
-.day {
-  min-height: 62px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+.day{
+  border-radius: 14px;
+  min-height: 52px;
   padding: 8px 8px 6px;
   position: relative;
 }
 
-.day.pad {
-  border: none;
-  background: transparent;
+.day.empty{
+  background: transparent !important;
+  border: none !important;
 }
 
-.day-number {
-  font-weight: 900;
-  opacity: 0.92;
-}
-
-.day-score {
-  margin-top: 8px;
+.day-number{
   font-size: 12px;
   font-weight: 800;
-  opacity: 0.9;
+  opacity: .9;
 }
 
-.day.filled {
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.day.today {
-  outline: 2px solid rgba(255, 255, 255, 0.35);
-  outline-offset: 2px;
-}
-
-.last {
-  margin-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 12px;
-}
-
-.last-title {
+.day-rating{
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 12px;
   font-weight: 900;
-  opacity: 0.9;
-  margin-bottom: 8px;
-}
-
-.last-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-
-.last-date {
-  opacity: 0.85;
-  font-weight: 700;
-}
-
-.last-rating {
-  font-weight: 900;
-}
-
-.last-desc {
-  opacity: 0.85;
-  line-height: 1.35;
-}
-
-.users {
-  margin-top: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 12px;
-}
-
-.users-title {
-  font-weight: 900;
-  margin-bottom: 10px;
-  opacity: 0.9;
-}
-
-.user {
-  width: 100%;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.92);
-  cursor: pointer;
-  margin-bottom: 8px;
-}
-
-.user:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.user.active {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.user-name {
-  font-weight: 900;
-}
-
-/* boutons (reprend le style existant du site si déjà défini globalement) */
-.btn {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.92);
-  border-radius: 12px;
-  padding: 9px 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.04);
+  opacity: .95;
 }
 </style>
