@@ -292,5 +292,116 @@ export function createEntryRepository(db) {
         `)
         .all();
     },
+
+    /**
+     * Get monthly averages for a user over the last N months
+     * @param {number} userId
+     * @param {number} months - Number of months to look back
+     * @returns {{ month: string, avgRating: number, entryCount: number }[]}
+     */
+    getMonthlyAverages(userId, months = 12) {
+      return db
+        .prepare(`
+          SELECT
+            strftime('%Y-%m', date) as month,
+            ROUND(AVG(rating), 1) as avgRating,
+            COUNT(*) as entryCount
+          FROM entries
+          WHERE user_id = ?
+            AND date >= date('now', '-' || ? || ' months')
+          GROUP BY strftime('%Y-%m', date)
+          ORDER BY month ASC
+        `)
+        .all(userId, months);
+    },
+
+    /**
+     * Get global monthly averages (all users) over the last N months
+     * @param {number} months - Number of months to look back
+     * @returns {{ month: string, avgRating: number, entryCount: number }[]}
+     */
+    getGlobalMonthlyAverages(months = 12) {
+      return db
+        .prepare(`
+          SELECT
+            strftime('%Y-%m', date) as month,
+            ROUND(AVG(rating), 1) as avgRating,
+            COUNT(*) as entryCount
+          FROM entries
+          WHERE date >= date('now', '-' || ? || ' months')
+          GROUP BY strftime('%Y-%m', date)
+          ORDER BY month ASC
+        `)
+        .all(months);
+    },
+
+    /**
+     * Get all entries for a user in a year (for heatmap)
+     * @param {number} userId
+     * @param {number} year
+     * @returns {{ date: string, rating: number }[]}
+     */
+    getYearEntries(userId, year) {
+      const startDate = `${year}-01-01`;
+      const endDate = `${year}-12-31`;
+      return db
+        .prepare(`
+          SELECT date, rating
+          FROM entries
+          WHERE user_id = ?
+            AND date >= ?
+            AND date <= ?
+          ORDER BY date ASC
+        `)
+        .all(userId, startDate, endDate);
+    },
+
+    /**
+     * Get rating distribution for a user
+     * @param {number} userId
+     * @returns {{ rating: number, count: number }[]}
+     */
+    getRatingDistribution(userId) {
+      return db
+        .prepare(`
+          SELECT rating, COUNT(*) as count
+          FROM entries
+          WHERE user_id = ?
+          GROUP BY rating
+          ORDER BY rating ASC
+        `)
+        .all(userId);
+    },
+
+    /**
+     * Get average rating by day of week for a user
+     * @param {number} userId
+     * @returns {{ dayOfWeek: number, avgRating: number, entryCount: number }[]}
+     */
+    getAverageByDayOfWeek(userId) {
+      return db
+        .prepare(`
+          SELECT
+            CAST(strftime('%w', date) AS INTEGER) as dayOfWeek,
+            ROUND(AVG(rating), 1) as avgRating,
+            COUNT(*) as entryCount
+          FROM entries
+          WHERE user_id = ?
+          GROUP BY strftime('%w', date)
+          ORDER BY dayOfWeek ASC
+        `)
+        .all(userId);
+    },
+
+    /**
+     * Get global average rating
+     * @returns {number|null}
+     */
+    getGlobalAverage() {
+      const row = db
+        .prepare(`SELECT ROUND(AVG(rating), 1) as avg FROM entries`)
+        .get();
+      return row?.avg ?? null;
+    },
   };
 }

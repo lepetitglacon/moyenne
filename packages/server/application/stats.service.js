@@ -184,5 +184,42 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
         topParticipants,
       };
     },
+
+    /**
+     * Get graph data for a user
+     * @param {{ userId: number, year?: number }} params
+     * @returns {Object} Graph data including monthly trends, heatmap, distribution
+     */
+    getGraphData({ userId, year }) {
+      const currentYear = year || new Date().getFullYear();
+
+      // Monthly averages for the user (last 12 months)
+      const userMonthly = entryRepo.getMonthlyAverages(userId, 12);
+
+      // Global monthly averages for comparison
+      const globalMonthly = entryRepo.getGlobalMonthlyAverages(12);
+
+      // Year entries for heatmap
+      const yearEntries = entryRepo.getYearEntries(userId, currentYear);
+
+      // Rating distribution
+      const distribution = entryRepo.getRatingDistribution(userId);
+
+      // Average by day of week
+      const byDayOfWeek = entryRepo.getAverageByDayOfWeek(userId);
+
+      // Global average for comparison
+      const globalAverage = entryRepo.getGlobalAverage();
+
+      return {
+        year: currentYear,
+        userMonthly,
+        globalMonthly,
+        yearEntries,
+        distribution,
+        byDayOfWeek,
+        globalAverage,
+      };
+    },
   };
 }

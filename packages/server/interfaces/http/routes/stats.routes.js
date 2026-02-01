@@ -58,5 +58,38 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
     }
   });
 
+  // Get graph data for current user
+  router.get("/me/graphs", authenticateToken, (req, res, next) => {
+    try {
+      const year = req.query.year ? Number(req.query.year) : undefined;
+      const data = statsService.getGraphData({
+        userId: req.user.id,
+        year,
+      });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get graph data for another user
+  router.get("/users/:id/graphs", authenticateToken, (req, res, next) => {
+    const userIdValidation = validateUserId(req.params.id);
+    if (!userIdValidation.valid) {
+      return res.status(400).json({ message: userIdValidation.error });
+    }
+
+    try {
+      const year = req.query.year ? Number(req.query.year) : undefined;
+      const data = statsService.getGraphData({
+        userId: Number(req.params.id),
+        year,
+      });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }
