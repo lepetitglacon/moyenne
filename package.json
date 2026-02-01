@@ -1,26 +1,19 @@
 {
   "name": "moyenne",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "dev": "pnpm -r --parallel run dev",
+    "dev:frontend": "pnpm --filter @moyenne/frontend dev",
+    "dev:server": "pnpm --filter @moyenne/server dev",
+    "dev:bot": "pnpm --filter @moyenne/discord-bot dev",
+    "build": "pnpm --filter @moyenne/frontend build",
+    "start:server": "pnpm --filter @moyenne/server start",
+    "start:bot": "pnpm --filter @moyenne/discord-bot start",
+    "test": "pnpm --filter @moyenne/server test"
   },
-  "dependencies": {
-    "@tanstack/vue-query": "^5.92.9",
-    "lucide-vue-next": "^0.563.0",
-    "reka-ui": "^2.8.0",
-    "vue": "^3.5.24",
-    "vue-router": "^5.0.1"
+  "engines": {
+    "node": ">=20"
   },
-  "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@vitejs/plugin-vue": "^6.0.1",
-    "@vue/tsconfig": "^0.8.1",
-    "typescript": "~5.9.3",
-    "vite": "^7.2.4",
-    "vue-tsc": "^3.1.4"
-  }
+  "packageManager": "pnpm@9.15.0"
 }

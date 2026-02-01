@@ -6,7 +6,7 @@ import {fileURLToPath} from "url";
 
 export const __filename = fileURLToPath(import.meta.url);
 export const __dirname = path.dirname(__filename);
-const dbPath = process.env.TEST_DB_PATH || path.join(__dirname, "database.sqlite");
+const dbPath = process.env.DB_PATH || process.env.TEST_DB_PATH || path.join(__dirname, "database.sqlite");
 const db = new Database(dbPath);
 
 function initDb() {
