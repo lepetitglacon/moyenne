@@ -7,6 +7,7 @@ import {
   getToday,
   getMonthRange,
   calculateRecapStats,
+  calculateStreak,
 } from "../domain/index.js";
 import { NotFoundError } from "../shared/errors.js";
 
@@ -19,6 +20,12 @@ import { NotFoundError } from "../shared/errors.js";
  */
 
 /**
+ * @typedef {Object} StreakInfo
+ * @property {number} currentStreak - Current consecutive days
+ * @property {number} longestStreak - All-time record
+ */
+
+/**
  * @typedef {Object} UserStatsResult
  * @property {string} today
  * @property {string} monthStart
@@ -28,6 +35,7 @@ import { NotFoundError } from "../shared/errors.js";
  * @property {number} participationCount
  * @property {number|null} currentMonthAvg
  * @property {{ date: string, rating: number }[]} monthEntries
+ * @property {StreakInfo} streak
  */
 
 /**
@@ -60,6 +68,10 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     const currentMonthAvg = entryRepo.getAvgByUserAndRange(userId, monthStart, monthEnd);
     const monthEntries = entryRepo.listByUserAndRange(userId, monthStart, monthEnd);
 
+    // Calculate streak
+    const allEntries = entryRepo.listAllByUser(userId);
+    const streakData = calculateStreak(allEntries, today);
+
     return {
       today,
       monthStart,
@@ -69,6 +81,10 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       participationCount,
       currentMonthAvg,
       monthEntries,
+      streak: {
+        currentStreak: streakData.currentStreak,
+        longestStreak: streakData.longestStreak,
+      },
     };
   }
 

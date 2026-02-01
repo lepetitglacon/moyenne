@@ -170,6 +170,22 @@ export function createEntryRepository(db) {
     },
 
     /**
+     * List all entries for a user (for streak calculation)
+     * @param {number} userId
+     * @returns {{ date: string }[]}
+     */
+    listAllByUser(userId) {
+      return db
+        .prepare(`
+          SELECT date
+          FROM entries
+          WHERE user_id = ?
+          ORDER BY date ASC
+        `)
+        .all(userId);
+    },
+
+    /**
      * Find next entry to review for a user
      * Returns a random entry from today that the user hasn't rated yet
      * @param {number} userId - Current user ID (excludes their own entry)
