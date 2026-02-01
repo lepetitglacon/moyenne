@@ -114,9 +114,9 @@ onMounted(async () => {
   await loadStatsFor("me");
 });
 
-function parseYMD(ymd: string) {
-  const [yy, mm, dd] = ymd.split("-").map((v) => Number(v));
-  return new Date(yy, mm - 1, dd);
+function parseYMD(ymd: string): Date {
+  const parts = ymd.split("-").map((v) => Number(v)) as [number, number, number];
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 const monthLabel = computed(() => {

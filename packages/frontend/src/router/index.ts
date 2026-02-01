@@ -6,6 +6,7 @@ import NoteDuJourView from "../views/NoteDuJourView.vue";
 import NoterAutreView from "../views/NoterAutreView.vue";
 import MerciView from "../views/MerciView.vue";
 import StatsView from "../views/StatsView.vue";
+import LeaderboardView from "../views/LeaderboardView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: "/noter-autre", name: "noterAutre", component: NoterAutreView, meta: { requiresAuth: true } },
     { path: "/merci", name: "merci", component: MerciView, meta: { requiresAuth: true } },
     { path: "/stats", name: "stats", component: StatsView, meta: { requiresAuth: true } },
+    { path: "/leaderboard", name: "leaderboard", component: LeaderboardView, meta: { requiresAuth: true } },
   ],
 });
 
