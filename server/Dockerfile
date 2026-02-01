@@ -1,22 +1,39 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
+
+# better-sqlite3 nécessite des outils de compilation
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy backend package files
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Install backend dependencies (production only)
-RUN npm ci --only=production
+# ---
 
-# Copy backend source code
+FROM node:20-alpine
+
+# Dépendances runtime pour better-sqlite3
+RUN apk add --no-cache libstdc++
+
+WORKDIR /app
+
+# Copie node_modules compilés
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copie du code source
 COPY . .
 
-# Environment variables
+# Crée dossier data et user non-root
+RUN mkdir -p /app/data && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Expose the port
 EXPOSE 3000
 
-# Start the server
 CMD ["node", "index.js"]
