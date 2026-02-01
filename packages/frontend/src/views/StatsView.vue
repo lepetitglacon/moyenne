@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
+import NavMenu from "../components/NavMenu.vue";
 import { useAuth } from "../composables/useAuth";
 
 const router = useRouter();
@@ -32,13 +33,9 @@ const users = ref<UserLite[]>([]);
 
 const stats = ref<UserStatsPayload | null>(null);
 
-// cible sélectionnée : "me" ou userId
 const target = ref<"me" | number>("me");
-
-// mois sélectionné : "YYYY-MM"
 const selectedMonth = ref<string>("");
 
-// -------- API --------
 async function loadUsers() {
   usersLoading.value = true;
   usersError.value = null;
@@ -75,11 +72,7 @@ async function loadStatsFor(t: "me" | number) {
   error.value = null;
 
   try {
-    const base =
-      t === "me"
-        ? "/api/me/stats"
-        : `/api/users/${t}/stats`;
-
+    const base = t === "me" ? "/api/me/stats" : `/api/users/${t}/stats`;
     const month = selectedMonth.value ? `?month=${encodeURIComponent(selectedMonth.value)}` : "";
     const res = await authFetch(`${base}${month}`);
 
@@ -88,7 +81,6 @@ async function loadStatsFor(t: "me" | number) {
 
     stats.value = data as UserStatsPayload;
 
-    // initialise selectedMonth au premier chargement
     if (!selectedMonth.value && stats.value?.monthStart) {
       selectedMonth.value = monthFromDateYMD(stats.value.monthStart);
     }
@@ -122,7 +114,6 @@ onMounted(async () => {
   await loadStatsFor("me");
 });
 
-// -------- Helpers calendrier --------
 function parseYMD(ymd: string) {
   const [yy, mm, dd] = ymd.split("-").map((v) => Number(v));
   return new Date(yy, mm - 1, dd);
@@ -145,19 +136,16 @@ const monthDays = computed(() => {
 const firstDayOffset = computed(() => {
   if (!stats.value) return 0;
   const start = parseYMD(stats.value.monthStart);
-  const jsDay = start.getDay(); // 0=dimanche..6=samedi
-  return (jsDay + 6) % 7; // lundi=0..dimanche=6
+  const jsDay = start.getDay();
+  return (jsDay + 6) % 7;
 });
 
 const entriesMap = computed(() => {
   const map = new Map<string, number>();
-
   (stats.value?.monthEntries || []).forEach((e) => map.set(e.date, e.rating));
-
   if (stats.value?.todayEntry) {
     map.set(stats.value.todayEntry.date, stats.value.todayEntry.rating);
   }
-
   return map;
 });
 
@@ -170,7 +158,6 @@ function dayKey(day: number) {
   return `${y}-${m}-${d}`;
 }
 
-// rouge -> vert
 function ratingToColor(rating: number) {
   const t = Math.max(0, Math.min(20, rating)) / 20;
   const r = Math.round(220 * (1 - t) + 40 * t);
@@ -185,7 +172,7 @@ function cellStyle(day: number) {
 
   if (rating === undefined) {
     return {
-      background: "rgba(255,255,255,.06)",
+      background: "rgba(255,255,255,.04)",
       border: "1px solid rgba(255,255,255,.08)",
     };
   }
@@ -204,9 +191,9 @@ function dayTitle(day: number) {
 }
 
 const headerTitle = computed(() => {
-  if (target.value === "me") return "Statistiques — moi";
+  if (target.value === "me") return "Mes statistiques";
   const u = users.value.find((x) => x.id === target.value);
-  return u ? `Statistiques — ${u.username}` : "Statistiques";
+  return u ? `Stats de ${u.username}` : "Statistiques";
 });
 
 function goEditToday() {
@@ -216,99 +203,68 @@ function goEditToday() {
 
 <template>
   <AppShell variant="center" :showDecor="false">
-    <div class="page-center">
-      <img class="brand-logo" src="../assets/img/tilt.png" alt="tilt" />
+    <div class="stats-page">
+      <header class="stats-header">
+        <img class="stats-logo" src="../assets/img/tilt.png" alt="tilt" />
+        <h1 class="stats-title">{{ headerTitle }}</h1>
 
-      <div class="panel panel--narrow">
-        <div class="step-title">{{ headerTitle }}</div>
-
-        <div class="form-group" style="margin-top: 10px;">
-          <div v-if="usersLoading" class="step-subtitle">Chargement des utilisateurs…</div>
-          <p v-else-if="usersError" class="form-error">{{ usersError }}</p>
-
-          <div v-else class="profile-switch">
-            <span class="profile-switch__label">Explorer un profil</span>
-
-            <div class="profile-switch__control">
-              <select
-                class="profile-switch__select"
-                :value="target === 'me' ? 'me' : String(target)"
-                @change="onTargetChange"
-              >
-                <option value="me">Moi</option>
-                <option v-for="u in users" :key="u.id" :value="String(u.id)">
-                  {{ u.username }}
-                </option>
-              </select>
-
-              <span class="profile-switch__chevron" aria-hidden="true">▾</span>
-            </div>
-          </div>
-        </div>
-
-        <template v-if="loading">
-          <div class="step-subtitle">Chargement…</div>
-        </template>
-
-        <template v-else-if="error">
-          <p class="form-error">{{ error }}</p>
-        </template>
-
-        <template v-else-if="stats">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Dernière note</div>
-              <div class="stat-value">
-                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }} / 20</span>
-                <span v-else>—</span>
-              </div>
-              <div class="stat-sub" v-if="stats.lastEntry">({{ stats.lastEntry.date }})</div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-label">Participations</div>
-              <div class="stat-value">{{ stats.participationCount }}</div>
-              <div class="stat-sub">jours notés</div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-label">Moyenne du mois</div>
-              <div class="stat-value">
-                <span v-if="stats.currentMonthAvg !== null">{{ stats.currentMonthAvg.toFixed(1) }} / 20</span>
-                <span v-else>—</span>
-              </div>
-              <div class="stat-sub">{{ monthLabel }}</div>
-            </div>
-          </div>
-
-          <button
-            v-if="target === 'me'"
-            class="btn btn-primary btn-wide"
-            type="button"
-            @click="goEditToday"
+        <div class="profile-switch" v-if="!usersLoading && !usersError">
+          <select
+            class="profile-select"
+            :value="target === 'me' ? 'me' : String(target)"
+            @change="onTargetChange"
           >
-            MODIFIER MA NOTE DU JOUR
-          </button>
+            <option value="me">Moi</option>
+            <option v-for="u in users" :key="u.id" :value="String(u.id)">
+              {{ u.username }}
+            </option>
+          </select>
+          <span class="select-chevron">▾</span>
+        </div>
+      </header>
 
-          <div class="calendar">
-            <div class="calendar-header">
-              <div class="calendar-nav">
-                <button class="nav-btn" type="button" @click="prevMonth" aria-label="Mois précédent">
-                  ‹
-                </button>
+      <div v-if="loading" class="loading-msg">Chargement...</div>
+      <div v-else-if="error" class="error-msg">{{ error }}</div>
 
-                <div class="step-subtitle">Calendrier — {{ monthLabel }}</div>
-
-                <button class="nav-btn" type="button" @click="nextMonth" aria-label="Mois suivant">
-                  ›
-                </button>
+      <template v-else-if="stats">
+        <div class="stats-content">
+          <div class="stats-cards">
+            <div class="card">
+              <div class="card-label">Dernière note</div>
+              <div class="card-value">
+                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }}<small>/20</small></span>
+                <span v-else>—</span>
               </div>
+              <div class="card-sub" v-if="stats.lastEntry">{{ stats.lastEntry.date }}</div>
+            </div>
 
-              <div class="calendar-legend">
-                <span class="dot" style="background: rgb(220,60,70)"></span>
-                <span class="legend-text">0</span>
-                <span class="dot" style="background: rgb(40,200,90)"></span>
-                <span class="legend-text">20</span>
+            <div class="card">
+              <div class="card-label">Participations</div>
+              <div class="card-value">{{ stats.participationCount }}</div>
+              <div class="card-sub">jours notés</div>
+            </div>
+
+            <div class="card">
+              <div class="card-label">Moyenne</div>
+              <div class="card-value">
+                <span v-if="stats.currentMonthAvg !== null">{{ stats.currentMonthAvg.toFixed(1) }}<small>/20</small></span>
+                <span v-else>—</span>
+              </div>
+              <div class="card-sub">{{ monthLabel }}</div>
+            </div>
+          </div>
+
+          <div class="calendar-section">
+            <div class="calendar-head">
+              <button class="cal-nav" type="button" @click="prevMonth" aria-label="Mois précédent">‹</button>
+              <span class="cal-month">{{ monthLabel }}</span>
+              <button class="cal-nav" type="button" @click="nextMonth" aria-label="Mois suivant">›</button>
+
+              <div class="cal-legend">
+                <span class="legend-dot" style="background: rgb(220,60,70)"></span>
+                <span class="legend-label">0</span>
+                <span class="legend-dot" style="background: rgb(40,200,90)"></span>
+                <span class="legend-label">20</span>
               </div>
             </div>
 
@@ -323,250 +279,288 @@ function goEditToday() {
             </div>
 
             <div class="calendar-grid">
-              <div v-for="i in firstDayOffset" :key="'empty-' + i" class="day empty"></div>
-
+              <div v-for="i in firstDayOffset" :key="'empty-' + i" class="cal-day empty"></div>
               <div
                 v-for="d in monthDays"
                 :key="'day-' + d"
-                class="day"
+                class="cal-day"
                 :style="cellStyle(d)"
                 :title="dayTitle(d)"
               >
-                <div class="day-number">{{ d }}</div>
-                <div class="day-rating" v-if="entriesMap.get(dayKey(d)) !== undefined">
+                <span class="day-num">{{ d }}</span>
+                <span class="day-score" v-if="entriesMap.get(dayKey(d)) !== undefined">
                   {{ entriesMap.get(dayKey(d)) }}
-                </div>
+                </span>
               </div>
             </div>
           </div>
-        </template>
-      </div>
+
+          <button
+            v-if="target === 'me'"
+            class="btn btn-primary edit-btn"
+            type="button"
+            @click="goEditToday"
+          >
+            MODIFIER MA NOTE
+          </button>
+        </div>
+      </template>
+
+      <NavMenu />
     </div>
   </AppShell>
 </template>
 
 <style scoped>
-/* ---- Switch profil ---- */
-.profile-switch{
+.stats-page {
+  width: min(1100px, 95vw);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.profile-switch__label{
-  font-size: 14px;
-  font-weight: 700;
-  opacity: .9;
+.stats-logo {
+  width: 48px;
+  height: auto;
 }
 
-.profile-switch__control{
+.stats-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+  flex: 1;
+}
+
+.profile-switch {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-.profile-switch__select{
+.profile-select {
   appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-
-  height: 40px;
-  padding: 0 42px 0 14px;
-
-  border-radius: 12px;
+  height: 36px;
+  padding: 0 36px 0 14px;
+  border-radius: 10px;
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.06);
   color: rgba(255,255,255,.92);
-
-  font-weight: 800;
-  letter-spacing: .1px;
-
+  font-weight: 700;
+  font-size: 14px;
   outline: none;
   cursor: pointer;
-
-  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
-
-  /* évite le dropdown blanc sur blanc */
   color-scheme: dark;
 }
 
-.profile-switch__select:hover{
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.16);
+.profile-select:hover {
+  background: rgba(255,255,255,.1);
 }
 
-.profile-switch__select:focus{
-  border-color: rgba(255,255,255,.22);
-  box-shadow: 0 0 0 3px rgba(255,255,255,.08);
-}
-
-.profile-switch__select option{
-  background: #0b1020;
-  color: rgba(255,255,255,.92);
-}
-
-.profile-switch__select option:checked{
-  background: #111827;
-  color: rgba(255,255,255,.95);
-}
-
-.profile-switch__chevron{
+.select-chevron {
   position: absolute;
-  right: 14px;
+  right: 12px;
   pointer-events: none;
-  opacity: .75;
-  font-size: 14px;
-  line-height: 1;
+  opacity: .7;
+  font-size: 12px;
 }
 
-/* ---- Stats ---- */
-.stats-grid{
+.loading-msg,
+.error-msg {
+  text-align: center;
+  padding: 24px;
+  opacity: .8;
+}
+
+.error-msg {
+  color: #ff7a7a;
+}
+
+.stats-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.stats-cards {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 12px;
-  margin-bottom: 14px;
 }
 
-.stat-card{
-  border-radius: 16px;
-  padding: 12px 14px;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.08);
-}
-
-.stat-label{
-  font-size: 12px;
-  opacity: .7;
-  margin-bottom: 6px;
-}
-
-.stat-value{
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: .2px;
-}
-
-.stat-sub{
-  margin-top: 4px;
-  font-size: 12px;
-  opacity: .55;
-}
-
-/* ---- Calendar ---- */
-.calendar{
-  margin-top: 16px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,.08);
-}
-
-.calendar-header{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.calendar-nav{
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.nav-btn{
-  width: 34px;
-  height: 34px;
+.card {
   border-radius: 12px;
-
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.10);
-  color: rgba(255,255,255,.92);
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 18px;
-  font-weight: 900;
-
-  cursor: pointer;
-  transition: background .15s ease, border-color .15s ease, transform .06s ease;
-}
-
-.nav-btn:hover{
-  background: rgba(255,255,255,.09);
-  border-color: rgba(255,255,255,.16);
-}
-
-.nav-btn:active{
-  transform: translateY(1px);
-}
-
-.nav-btn:focus{
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255,255,255,.08);
-}
-
-.calendar-legend{
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  opacity: .8;
-}
-
-.dot{
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.legend-text{
-  font-size: 12px;
-  opacity: .8;
-}
-
-.calendar-weekdays{
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
-  opacity: .7;
-  font-size: 12px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
   text-align: center;
 }
 
-.calendar-grid{
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+.card-label {
+  font-size: 12px;
+  opacity: .65;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
-.day{
-  border-radius: 14px;
-  min-height: 52px;
-  padding: 8px 8px 6px;
+.card-value {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.card-value small {
+  font-size: 14px;
+  opacity: .7;
+}
+
+.card-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: .5;
+}
+
+.calendar-section {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 14px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cal-nav {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: rgba(255,255,255,.9);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cal-nav:hover {
+  background: rgba(255,255,255,.1);
+}
+
+.cal-month {
+  font-weight: 700;
+  font-size: 15px;
+  text-transform: capitalize;
+  flex: 1;
+}
+
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: .75;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: .6;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  flex: 1;
+}
+
+.cal-day {
+  border-radius: 8px;
+  min-height: 42px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   position: relative;
 }
 
-.day.empty{
+.cal-day.empty {
   background: transparent !important;
   border: none !important;
 }
 
-.day-number{
+.day-num {
   font-size: 12px;
-  font-weight: 800;
-  opacity: .9;
+  font-weight: 700;
+  opacity: .85;
 }
 
-.day-rating{
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  font-size: 12px;
-  font-weight: 900;
-  opacity: .95;
+.day-score {
+  font-size: 11px;
+  font-weight: 800;
+  opacity: .9;
+  margin-top: 2px;
+}
+
+.edit-btn {
+  align-self: center;
+  width: auto;
+  padding: 0 32px;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .stats-title {
+    font-size: 18px;
+  }
+
+  .card-value {
+    font-size: 22px;
+  }
 }
 </style>
