@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.env
+*.sqlite
+.git
+.gitignore
+__tests__
+vitest.config.js
