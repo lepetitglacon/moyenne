@@ -697,9 +697,16 @@ const headerTitle = computed(() => {
 .dow-value { font-size: 10px; font-weight: 700; }
 
 .heatmap-box { overflow-x: auto; }
-.heatmap-grid { display: flex; gap: 2px; }
-.heatmap-week { display: flex; flex-direction: column; gap: 2px; }
-.heatmap-day { width: 10px; height: 10px; border-radius: 2px; }
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  gap: 2px;
+  width: 100%;
+}
+.heatmap-week { display: contents; }
+.heatmap-day { aspect-ratio: 1; border-radius: 2px; }
 .heatmap-day:hover { outline: 1px solid rgba(255,255,255,.4); }
 
 .heatmap-legend {
