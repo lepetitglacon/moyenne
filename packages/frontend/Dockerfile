@@ -22,6 +22,11 @@ COPY packages/frontend ./packages/frontend
 
 # Build
 WORKDIR /app/packages/frontend
+
+# Build arg for Vite env variable
+ARG VITE_API_BASE=/api
+ENV VITE_API_BASE=$VITE_API_BASE
+
 RUN pnpm build
 
 # ---
@@ -37,13 +42,13 @@ RUN echo 'server { \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
-        try_files $uri $uri/ /index.html; \
+    try_files $uri $uri/ /index.html; \
     } \
     location /assets { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
+    expires 1y; \
+    add_header Cache-Control "public, immutable"; \
     } \
-}' > /etc/nginx/conf.d/default.conf
+    }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
