@@ -1,5 +1,5 @@
 /**
- * Entry Service - Entry and rating use cases
+ * Entry Service - Entry and rating use cases (PostgreSQL)
  * Handles saving entries, getting reviews, saving ratings
  */
 
@@ -37,11 +37,11 @@ export function createEntryService({ entryRepo, ratingRepo, logger }) {
     /**
      * Save or update an entry for today
      * @param {{ userId: number, rating: number, description?: string }} params
-     * @returns {SaveEntryResult}
+     * @returns {Promise<SaveEntryResult>}
      */
-    saveEntry({ userId, rating, description }) {
+    async saveEntry({ userId, rating, description }) {
       const today = getToday();
-      const { isUpdate } = entryRepo.upsert(userId, today, rating, description);
+      const { isUpdate } = await entryRepo.upsert(userId, today, rating, description);
 
       if (isUpdate) {
         logger?.debug("Entrée mise à jour", { userId, date: today, rating });
@@ -56,11 +56,11 @@ export function createEntryService({ entryRepo, ratingRepo, logger }) {
      * Get next entry to review for a user
      * Returns entries from yesterday only (users rate previous day's entries)
      * @param {{ userId: number }} params
-     * @returns {NextReviewResult}
+     * @returns {Promise<NextReviewResult>}
      */
-    getNextReview({ userId }) {
+    async getNextReview({ userId }) {
       const yesterday = getYesterday();
-      const entry = entryRepo.findNextReviewForUser(userId, yesterday);
+      const entry = await entryRepo.findNextReviewForUser(userId, yesterday);
 
       if (!entry) {
         return { done: true };
@@ -80,13 +80,14 @@ export function createEntryService({ entryRepo, ratingRepo, logger }) {
      * Save a rating for another user's entry
      * Only allows rating entries from yesterday
      * @param {{ fromUserId: number, toUserId: number, date: string, rating: number }} params
+     * @returns {Promise<void>}
      */
-    saveRating({ fromUserId, toUserId, date, rating }) {
+    async saveRating({ fromUserId, toUserId, date, rating }) {
       const yesterday = getYesterday();
       if (date !== yesterday) {
         throw new ValidationError("Tu ne peux noter que les entrées de la veille");
       }
-      ratingRepo.create(fromUserId, toUserId, date, rating);
+      await ratingRepo.create(fromUserId, toUserId, date, rating);
       logger?.info("Rating enregistré", { fromUserId, toUserId, date, rating });
     },
   };

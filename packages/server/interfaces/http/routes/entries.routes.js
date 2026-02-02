@@ -1,5 +1,5 @@
 /**
- * Entries routes - entries, reviews, ratings
+ * Entries routes - entries, reviews, ratings (PostgreSQL async)
  */
 
 import express from "express";
@@ -15,10 +15,10 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
   const router = express.Router();
 
   // Add entry
-  router.post("/entries", authenticateToken, (req, res, next) => {
+  router.post("/entries", authenticateToken, async (req, res, next) => {
     try {
       const { rating, description } = req.body;
-      entryService.saveEntry({ userId: req.user.id, rating, description });
+      await entryService.saveEntry({ userId: req.user.id, rating, description });
       res.json({ message: "Saved" });
     } catch (err) {
       next(err);
@@ -26,9 +26,9 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
   });
 
   // Get next review
-  router.get("/review/next", authenticateToken, (req, res, next) => {
+  router.get("/review/next", authenticateToken, async (req, res, next) => {
     try {
-      const result = entryService.getNextReview({ userId: req.user.id });
+      const result = await entryService.getNextReview({ userId: req.user.id });
 
       if (result.done) {
         return res.json({ done: true });
@@ -47,10 +47,10 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
   });
 
   // Add rating
-  router.post("/ratings", authenticateToken, (req, res, next) => {
+  router.post("/ratings", authenticateToken, async (req, res, next) => {
     try {
       const { toUserId, date, rating } = req.body;
-      entryService.saveRating({ fromUserId: req.user.id, toUserId, date, rating });
+      await entryService.saveRating({ fromUserId: req.user.id, toUserId, date, rating });
       res.json({ message: "Rating saved" });
     } catch (err) {
       next(err);

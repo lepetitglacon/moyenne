@@ -1,5 +1,5 @@
 /**
- * Auth Service - Authentication use cases
+ * Auth Service - Authentication use cases (PostgreSQL)
  * Handles login, registration logic
  */
 
@@ -35,11 +35,11 @@ export function createAuthService({ userRepo, config, logger }) {
     /**
      * Register a new user
      * @param {{ username: string, password: string }} credentials
-     * @returns {RegisterResult}
+     * @returns {Promise<RegisterResult>}
      * @throws {ValidationError} If credentials are invalid
      * @throws {ConflictError} If username already taken
      */
-    register({ username, password }) {
+    async register({ username, password }) {
       // Validate input
       const validation = validateCredentials({ username, password });
       if (!validation.valid) {
@@ -47,13 +47,13 @@ export function createAuthService({ userRepo, config, logger }) {
       }
 
       // Check if username exists
-      if (userRepo.existsByUsername(username)) {
+      if (await userRepo.existsByUsername(username)) {
         throw new ConflictError("Username already taken");
       }
 
       // Hash password and create user
       const passwordHash = bcrypt.hashSync(password, 10);
-      const result = userRepo.create(username, passwordHash);
+      const result = await userRepo.create(username, passwordHash);
 
       logger?.info("Nouvel utilisateur créé", { username });
 
@@ -68,11 +68,11 @@ export function createAuthService({ userRepo, config, logger }) {
     /**
      * Login user and return JWT token
      * @param {{ username: string, password: string }} credentials
-     * @returns {LoginResult}
+     * @returns {Promise<LoginResult>}
      * @throws {ValidationError} If credentials are invalid format
      * @throws {AuthError} If credentials don't match
      */
-    login({ username, password }) {
+    async login({ username, password }) {
       // Validate input
       const validation = validateCredentials({ username, password });
       if (!validation.valid) {
@@ -80,7 +80,7 @@ export function createAuthService({ userRepo, config, logger }) {
       }
 
       // Find user
-      const user = userRepo.findByUsernameWithPassword(username);
+      const user = await userRepo.findByUsernameWithPassword(username);
       if (!user) {
         logger?.debug("Utilisateur non trouvé", { username });
         throw new AuthError("Invalid credentials");

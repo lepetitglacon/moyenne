@@ -1,5 +1,5 @@
 /**
- * Users routes - user list
+ * Users routes - user list (PostgreSQL async)
  */
 
 import express from "express";
@@ -15,9 +15,9 @@ export function createUsersRoutes({ statsService, authenticateToken }) {
   const router = express.Router();
 
   // List users
-  router.get("/users", authenticateToken, (req, res, next) => {
+  router.get("/users", authenticateToken, async (req, res, next) => {
     try {
-      const users = statsService.listUsers();
+      const users = await statsService.listUsers();
       res.json({ users });
     } catch (err) {
       next(err);

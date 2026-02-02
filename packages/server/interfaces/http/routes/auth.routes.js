@@ -1,5 +1,5 @@
 /**
- * Auth routes - login/register
+ * Auth routes - login/register (PostgreSQL async)
  */
 
 import express from "express";
@@ -12,10 +12,10 @@ export function createAuthRoutes({ authService }) {
   const router = express.Router();
 
   // Login
-  router.post("/login", (req, res, next) => {
+  router.post("/login", async (req, res, next) => {
     try {
       const { username, password } = req.body;
-      const { token } = authService.login({ username, password });
+      const { token } = await authService.login({ username, password });
       res.json({ token });
     } catch (err) {
       next(err);
@@ -23,10 +23,10 @@ export function createAuthRoutes({ authService }) {
   });
 
   // Register
-  router.post("/register", (req, res, next) => {
+  router.post("/register", async (req, res, next) => {
     try {
       const { username, password } = req.body;
-      authService.register({ username, password });
+      await authService.register({ username, password });
       res.json({ message: "User created" });
     } catch (err) {
       next(err);

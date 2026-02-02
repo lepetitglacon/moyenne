@@ -1,5 +1,5 @@
 /**
- * Server Bootstrap
+ * Server Bootstrap (PostgreSQL async)
  * - Load config
  * - Initialize DB
  * - Initialize repositories
@@ -14,7 +14,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db, initDb } from "./db.js";
+import { pool, initDb } from "./db.js";
 import { logger, Logger } from "./logger.js";
 import config from "./config.js";
 
@@ -48,13 +48,10 @@ import {
 export const __filename = fileURLToPath(import.meta.url);
 export const __dirname = path.dirname(__filename);
 
-// Initialize database
-initDb();
-
-// Initialize repositories
-const userRepo = createUserRepository(db);
-const entryRepo = createEntryRepository(db);
-const ratingRepo = createRatingRepository(db);
+// Initialize repositories (with pool)
+const userRepo = createUserRepository(pool);
+const entryRepo = createEntryRepository(pool);
+const ratingRepo = createRatingRepository(pool);
 
 // Initialize loggers
 const logAuth = new Logger("Auth");
@@ -111,12 +108,18 @@ app.use("/api", createBotRoutes({ statsService, authenticateBot, logger: logBot 
 app.use(errorMiddleware);
 
 // Export for testing
-export { app, db };
+export { app, pool };
 
 // Start server only when run directly
 const isMainModule = process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]));
 if (isMainModule) {
-  app.listen(config.port, () => {
-    logger.info(`Serveur démarré sur http://localhost:${config.port}`);
+  // Initialize database before starting server
+  initDb().then(() => {
+    app.listen(config.port, () => {
+      logger.info(`Serveur démarré sur http://localhost:${config.port}`);
+    });
+  }).catch((err) => {
+    logger.error("Erreur d'initialisation de la base de données", { error: err.message });
+    process.exit(1);
   });
 }

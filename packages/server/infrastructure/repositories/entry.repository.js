@@ -1,6 +1,6 @@
 /**
- * Entry Repository - Data access layer for entries table
- * Factory pattern with db injection
+ * Entry Repository - Data access layer for entries table (PostgreSQL)
+ * Factory pattern with pool injection
  */
 
 /**
@@ -23,37 +23,39 @@
 
 /**
  * Create an entry repository instance
- * @param {import('better-sqlite3').Database} db - SQLite database instance
+ * @param {import('pg').Pool} pool - PostgreSQL pool instance
  */
-export function createEntryRepository(db) {
+export function createEntryRepository(pool) {
   return {
     /**
      * Find entry by user ID and date
      * @param {number} userId
      * @param {string} date - YYYY-MM-DD
-     * @returns {{ id: number }|undefined}
+     * @returns {Promise<{ id: number }|undefined>}
      */
-    findIdByUserAndDate(userId, date) {
-      return db
-        .prepare("SELECT id FROM entries WHERE user_id = ? AND date = ?")
-        .get(userId, date);
+    async findIdByUserAndDate(userId, date) {
+      const result = await pool.query(
+        "SELECT id FROM entries WHERE user_id = $1 AND date = $2",
+        [userId, date]
+      );
+      return result.rows[0];
     },
 
     /**
      * Get entry details by user ID and date
      * @param {number} userId
      * @param {string} date - YYYY-MM-DD
-     * @returns {{ date: string, rating: number, description: string|null }|undefined}
+     * @returns {Promise<{ date: string, rating: number, description: string|null }|undefined>}
      */
-    findByUserAndDate(userId, date) {
-      return db
-        .prepare(`
-          SELECT date, rating, description
-          FROM entries
-          WHERE user_id = ? AND date = ?
-          LIMIT 1
-        `)
-        .get(userId, date);
+    async findByUserAndDate(userId, date) {
+      const result = await pool.query(
+        `SELECT date, rating, description
+         FROM entries
+         WHERE user_id = $1 AND date = $2
+         LIMIT 1`,
+        [userId, date]
+      );
+      return result.rows[0];
     },
 
     /**
@@ -62,11 +64,14 @@ export function createEntryRepository(db) {
      * @param {string} date
      * @param {number} rating
      * @param {string|null} description
+     * @returns {Promise<{ rowCount: number }>}
      */
-    insert(userId, date, rating, description) {
-      return db
-        .prepare("INSERT INTO entries (user_id, date, rating, description) VALUES (?, ?, ?, ?)")
-        .run(userId, date, rating, description);
+    async insert(userId, date, rating, description) {
+      const result = await pool.query(
+        "INSERT INTO entries (user_id, date, rating, description) VALUES ($1, $2, $3, $4)",
+        [userId, date, rating, description]
+      );
+      return { rowCount: result.rowCount };
     },
 
     /**
@@ -74,11 +79,14 @@ export function createEntryRepository(db) {
      * @param {number} id - Entry ID
      * @param {number} rating
      * @param {string|null} description
+     * @returns {Promise<{ rowCount: number }>}
      */
-    update(id, rating, description) {
-      return db
-        .prepare("UPDATE entries SET rating = ?, description = ? WHERE id = ?")
-        .run(rating, description, id);
+    async update(id, rating, description) {
+      const result = await pool.query(
+        "UPDATE entries SET rating = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3",
+        [rating, description, id]
+      );
+      return { rowCount: result.rowCount };
     },
 
     /**
@@ -87,15 +95,15 @@ export function createEntryRepository(db) {
      * @param {string} date
      * @param {number} rating
      * @param {string|null} description
-     * @returns {{ isUpdate: boolean }}
+     * @returns {Promise<{ isUpdate: boolean }>}
      */
-    upsert(userId, date, rating, description) {
-      const existing = this.findIdByUserAndDate(userId, date);
+    async upsert(userId, date, rating, description) {
+      const existing = await this.findIdByUserAndDate(userId, date);
       if (existing) {
-        this.update(existing.id, rating, description);
+        await this.update(existing.id, rating, description);
         return { isUpdate: true };
       } else {
-        this.insert(userId, date, rating, description);
+        await this.insert(userId, date, rating, description);
         return { isUpdate: false };
       }
     },
@@ -103,30 +111,31 @@ export function createEntryRepository(db) {
     /**
      * Get last entry for a user (most recent by date)
      * @param {number} userId
-     * @returns {{ date: string, rating: number, description: string|null }|undefined}
+     * @returns {Promise<{ date: string, rating: number, description: string|null }|undefined>}
      */
-    getLastByUser(userId) {
-      return db
-        .prepare(`
-          SELECT date, rating, description
-          FROM entries
-          WHERE user_id = ?
-          ORDER BY date DESC
-          LIMIT 1
-        `)
-        .get(userId);
+    async getLastByUser(userId) {
+      const result = await pool.query(
+        `SELECT date, rating, description
+         FROM entries
+         WHERE user_id = $1
+         ORDER BY date DESC
+         LIMIT 1`,
+        [userId]
+      );
+      return result.rows[0];
     },
 
     /**
      * Count total entries for a user
      * @param {number} userId
-     * @returns {number}
+     * @returns {Promise<number>}
      */
-    countByUser(userId) {
-      const row = db
-        .prepare("SELECT COUNT(*) as count FROM entries WHERE user_id = ?")
-        .get(userId);
-      return row?.count ?? 0;
+    async countByUser(userId) {
+      const result = await pool.query(
+        "SELECT COUNT(*) as count FROM entries WHERE user_id = $1",
+        [userId]
+      );
+      return parseInt(result.rows[0]?.count ?? 0, 10);
     },
 
     /**
@@ -134,19 +143,18 @@ export function createEntryRepository(db) {
      * @param {number} userId
      * @param {string} startDate - YYYY-MM-DD
      * @param {string} endDate - YYYY-MM-DD
-     * @returns {number|null}
+     * @returns {Promise<number|null>}
      */
-    getAvgByUserAndRange(userId, startDate, endDate) {
-      const row = db
-        .prepare(`
-          SELECT AVG(rating) as avg
-          FROM entries
-          WHERE user_id = ?
-            AND date >= ?
-            AND date <= ?
-        `)
-        .get(userId, startDate, endDate);
-      return row?.avg ?? null;
+    async getAvgByUserAndRange(userId, startDate, endDate) {
+      const result = await pool.query(
+        `SELECT AVG(rating) as avg
+         FROM entries
+         WHERE user_id = $1
+           AND date >= $2
+           AND date <= $3`,
+        [userId, startDate, endDate]
+      );
+      return result.rows[0]?.avg ? parseFloat(result.rows[0].avg) : null;
     },
 
     /**
@@ -154,35 +162,35 @@ export function createEntryRepository(db) {
      * @param {number} userId
      * @param {string} startDate - YYYY-MM-DD
      * @param {string} endDate - YYYY-MM-DD
-     * @returns {{ date: string, rating: number }[]}
+     * @returns {Promise<{ date: string, rating: number }[]>}
      */
-    listByUserAndRange(userId, startDate, endDate) {
-      return db
-        .prepare(`
-          SELECT date, rating
-          FROM entries
-          WHERE user_id = ?
-            AND date >= ?
-            AND date <= ?
-          ORDER BY date ASC
-        `)
-        .all(userId, startDate, endDate);
+    async listByUserAndRange(userId, startDate, endDate) {
+      const result = await pool.query(
+        `SELECT date, rating
+         FROM entries
+         WHERE user_id = $1
+           AND date >= $2
+           AND date <= $3
+         ORDER BY date ASC`,
+        [userId, startDate, endDate]
+      );
+      return result.rows;
     },
 
     /**
      * List all entries for a user (for streak calculation)
      * @param {number} userId
-     * @returns {{ date: string }[]}
+     * @returns {Promise<{ date: string }[]>}
      */
-    listAllByUser(userId) {
-      return db
-        .prepare(`
-          SELECT date
-          FROM entries
-          WHERE user_id = ?
-          ORDER BY date ASC
-        `)
-        .all(userId);
+    async listAllByUser(userId) {
+      const result = await pool.query(
+        `SELECT date
+         FROM entries
+         WHERE user_id = $1
+         ORDER BY date ASC`,
+        [userId]
+      );
+      return result.rows;
     },
 
     /**
@@ -190,218 +198,216 @@ export function createEntryRepository(db) {
      * Returns a random entry from today that the user hasn't rated yet
      * @param {number} userId - Current user ID (excludes their own entry)
      * @param {string} date - YYYY-MM-DD
-     * @returns {EntryWithUser|undefined}
+     * @returns {Promise<EntryWithUser|undefined>}
      */
-    findNextReviewForUser(userId, date) {
-      return db
-        .prepare(`
-          SELECT e.user_id, u.username, e.date, e.rating, e.description
-          FROM entries e
-          JOIN users u ON u.id = e.user_id
-          WHERE e.user_id != ?
-            AND e.date = ?
-            AND NOT EXISTS (
-              SELECT 1 FROM ratings r
-              WHERE r.from_user_id = ?
-                AND r.to_user_id = e.user_id
-                AND r.date = e.date
-            )
-          ORDER BY RANDOM()
-          LIMIT 1
-        `)
-        .get(userId, date, userId);
+    async findNextReviewForUser(userId, date) {
+      const result = await pool.query(
+        `SELECT e.user_id, u.username, e.date, e.rating, e.description
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.user_id != $1
+           AND e.date = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM ratings r
+             WHERE r.from_user_id = $1
+               AND r.to_user_id = e.user_id
+               AND r.date = e.date
+           )
+         ORDER BY RANDOM()
+         LIMIT 1`,
+        [userId, date]
+      );
+      return result.rows[0];
     },
 
     /**
      * List all entries for a date with user info (for recap)
      * Sorted by rating DESC
      * @param {string} date - YYYY-MM-DD
-     * @returns {EntryWithUser[]}
+     * @returns {Promise<EntryWithUser[]>}
      */
-    listByDateWithUsers(date) {
-      return db
-        .prepare(`
-          SELECT e.*, u.username
-          FROM entries e
-          JOIN users u ON u.id = e.user_id
-          WHERE e.date = ?
-          ORDER BY e.rating DESC
-        `)
-        .all(date);
+    async listByDateWithUsers(date) {
+      const result = await pool.query(
+        `SELECT e.*, u.username
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.date = $1
+         ORDER BY e.rating DESC`,
+        [date]
+      );
+      return result.rows;
     },
 
     /**
      * Get leaderboard by average rating for a date range
      * @param {string} startDate - YYYY-MM-DD
      * @param {string} endDate - YYYY-MM-DD
-     * @returns {{ userId: number, username: string, avgRating: number, entryCount: number }[]}
+     * @returns {Promise<{ userid: number, username: string, avgrating: number, entrycount: number }[]>}
      */
-    getLeaderboardByAvg(startDate, endDate) {
-      return db
-        .prepare(`
-          SELECT
-            e.user_id as userId,
-            u.username,
-            ROUND(AVG(e.rating), 1) as avgRating,
-            COUNT(*) as entryCount
-          FROM entries e
-          JOIN users u ON u.id = e.user_id
-          WHERE e.date >= ? AND e.date <= ?
-          GROUP BY e.user_id
-          ORDER BY avgRating DESC, entryCount DESC
-        `)
-        .all(startDate, endDate);
+    async getLeaderboardByAvg(startDate, endDate) {
+      const result = await pool.query(
+        `SELECT
+           e.user_id as userid,
+           u.username,
+           ROUND(AVG(e.rating)::numeric, 1) as avgrating,
+           COUNT(*)::int as entrycount
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.date >= $1 AND e.date <= $2
+         GROUP BY e.user_id, u.username
+         ORDER BY avgrating DESC, entrycount DESC`,
+        [startDate, endDate]
+      );
+      return result.rows;
     },
 
     /**
      * Get all-time leaderboard by average rating
-     * @returns {{ userId: number, username: string, avgRating: number, entryCount: number }[]}
+     * @returns {Promise<{ userid: number, username: string, avgrating: number, entrycount: number }[]>}
      */
-    getLeaderboardAllTime() {
-      return db
-        .prepare(`
-          SELECT
-            e.user_id as userId,
-            u.username,
-            ROUND(AVG(e.rating), 1) as avgRating,
-            COUNT(*) as entryCount
-          FROM entries e
-          JOIN users u ON u.id = e.user_id
-          GROUP BY e.user_id
-          ORDER BY avgRating DESC, entryCount DESC
-        `)
-        .all();
+    async getLeaderboardAllTime() {
+      const result = await pool.query(
+        `SELECT
+           e.user_id as userid,
+           u.username,
+           ROUND(AVG(e.rating)::numeric, 1) as avgrating,
+           COUNT(*)::int as entrycount
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         GROUP BY e.user_id, u.username
+         ORDER BY avgrating DESC, entrycount DESC`
+      );
+      return result.rows;
     },
 
     /**
      * Get leaderboard by participation count
-     * @returns {{ userId: number, username: string, entryCount: number, avgRating: number }[]}
+     * @returns {Promise<{ userid: number, username: string, entrycount: number, avgrating: number }[]>}
      */
-    getLeaderboardByParticipation() {
-      return db
-        .prepare(`
-          SELECT
-            e.user_id as userId,
-            u.username,
-            COUNT(*) as entryCount,
-            ROUND(AVG(e.rating), 1) as avgRating
-          FROM entries e
-          JOIN users u ON u.id = e.user_id
-          GROUP BY e.user_id
-          ORDER BY entryCount DESC, avgRating DESC
-        `)
-        .all();
+    async getLeaderboardByParticipation() {
+      const result = await pool.query(
+        `SELECT
+           e.user_id as userid,
+           u.username,
+           COUNT(*)::int as entrycount,
+           ROUND(AVG(e.rating)::numeric, 1) as avgrating
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         GROUP BY e.user_id, u.username
+         ORDER BY entrycount DESC, avgrating DESC`
+      );
+      return result.rows;
     },
 
     /**
      * Get monthly averages for a user over the last N months
      * @param {number} userId
      * @param {number} months - Number of months to look back
-     * @returns {{ month: string, avgRating: number, entryCount: number }[]}
+     * @returns {Promise<{ month: string, avgrating: number, entrycount: number }[]>}
      */
-    getMonthlyAverages(userId, months = 12) {
-      return db
-        .prepare(`
-          SELECT
-            strftime('%Y-%m', date) as month,
-            ROUND(AVG(rating), 1) as avgRating,
-            COUNT(*) as entryCount
-          FROM entries
-          WHERE user_id = ?
-            AND date >= date('now', '-' || ? || ' months')
-          GROUP BY strftime('%Y-%m', date)
-          ORDER BY month ASC
-        `)
-        .all(userId, months);
+    async getMonthlyAverages(userId, months = 12) {
+      const result = await pool.query(
+        `SELECT
+           TO_CHAR(date, 'YYYY-MM') as month,
+           ROUND(AVG(rating)::numeric, 1) as avgrating,
+           COUNT(*)::int as entrycount
+         FROM entries
+         WHERE user_id = $1
+           AND date >= CURRENT_DATE - INTERVAL '1 month' * $2
+         GROUP BY TO_CHAR(date, 'YYYY-MM')
+         ORDER BY month ASC`,
+        [userId, months]
+      );
+      return result.rows;
     },
 
     /**
      * Get global monthly averages (all users) over the last N months
      * @param {number} months - Number of months to look back
-     * @returns {{ month: string, avgRating: number, entryCount: number }[]}
+     * @returns {Promise<{ month: string, avgrating: number, entrycount: number }[]>}
      */
-    getGlobalMonthlyAverages(months = 12) {
-      return db
-        .prepare(`
-          SELECT
-            strftime('%Y-%m', date) as month,
-            ROUND(AVG(rating), 1) as avgRating,
-            COUNT(*) as entryCount
-          FROM entries
-          WHERE date >= date('now', '-' || ? || ' months')
-          GROUP BY strftime('%Y-%m', date)
-          ORDER BY month ASC
-        `)
-        .all(months);
+    async getGlobalMonthlyAverages(months = 12) {
+      const result = await pool.query(
+        `SELECT
+           TO_CHAR(date, 'YYYY-MM') as month,
+           ROUND(AVG(rating)::numeric, 1) as avgrating,
+           COUNT(*)::int as entrycount
+         FROM entries
+         WHERE date >= CURRENT_DATE - INTERVAL '1 month' * $1
+         GROUP BY TO_CHAR(date, 'YYYY-MM')
+         ORDER BY month ASC`,
+        [months]
+      );
+      return result.rows;
     },
 
     /**
      * Get all entries for a user in a year (for heatmap)
      * @param {number} userId
      * @param {number} year
-     * @returns {{ date: string, rating: number }[]}
+     * @returns {Promise<{ date: string, rating: number }[]>}
      */
-    getYearEntries(userId, year) {
+    async getYearEntries(userId, year) {
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
-      return db
-        .prepare(`
-          SELECT date, rating
-          FROM entries
-          WHERE user_id = ?
-            AND date >= ?
-            AND date <= ?
-          ORDER BY date ASC
-        `)
-        .all(userId, startDate, endDate);
+      const result = await pool.query(
+        `SELECT date, rating
+         FROM entries
+         WHERE user_id = $1
+           AND date >= $2
+           AND date <= $3
+         ORDER BY date ASC`,
+        [userId, startDate, endDate]
+      );
+      return result.rows;
     },
 
     /**
      * Get rating distribution for a user
      * @param {number} userId
-     * @returns {{ rating: number, count: number }[]}
+     * @returns {Promise<{ rating: number, count: number }[]>}
      */
-    getRatingDistribution(userId) {
-      return db
-        .prepare(`
-          SELECT rating, COUNT(*) as count
-          FROM entries
-          WHERE user_id = ?
-          GROUP BY rating
-          ORDER BY rating ASC
-        `)
-        .all(userId);
+    async getRatingDistribution(userId) {
+      const result = await pool.query(
+        `SELECT rating, COUNT(*)::int as count
+         FROM entries
+         WHERE user_id = $1
+         GROUP BY rating
+         ORDER BY rating ASC`,
+        [userId]
+      );
+      return result.rows;
     },
 
     /**
      * Get average rating by day of week for a user
      * @param {number} userId
-     * @returns {{ dayOfWeek: number, avgRating: number, entryCount: number }[]}
+     * @returns {Promise<{ dayofweek: number, avgrating: number, entrycount: number }[]>}
      */
-    getAverageByDayOfWeek(userId) {
-      return db
-        .prepare(`
-          SELECT
-            CAST(strftime('%w', date) AS INTEGER) as dayOfWeek,
-            ROUND(AVG(rating), 1) as avgRating,
-            COUNT(*) as entryCount
-          FROM entries
-          WHERE user_id = ?
-          GROUP BY strftime('%w', date)
-          ORDER BY dayOfWeek ASC
-        `)
-        .all(userId);
+    async getAverageByDayOfWeek(userId) {
+      const result = await pool.query(
+        `SELECT
+           EXTRACT(DOW FROM date)::int as dayofweek,
+           ROUND(AVG(rating)::numeric, 1) as avgrating,
+           COUNT(*)::int as entrycount
+         FROM entries
+         WHERE user_id = $1
+         GROUP BY EXTRACT(DOW FROM date)
+         ORDER BY dayofweek ASC`,
+        [userId]
+      );
+      return result.rows;
     },
 
     /**
      * Get global average rating
-     * @returns {number|null}
+     * @returns {Promise<number|null>}
      */
-    getGlobalAverage() {
-      const row = db
-        .prepare(`SELECT ROUND(AVG(rating), 1) as avg FROM entries`)
-        .get();
-      return row?.avg ?? null;
+    async getGlobalAverage() {
+      const result = await pool.query(
+        `SELECT ROUND(AVG(rating)::numeric, 1) as avg FROM entries`
+      );
+      return result.rows[0]?.avg ? parseFloat(result.rows[0].avg) : null;
     },
   };
 }

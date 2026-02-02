@@ -1,5 +1,5 @@
 /**
- * Stats routes - user stats
+ * Stats routes - user stats (PostgreSQL async)
  */
 
 import express from "express";
@@ -16,9 +16,9 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
   const router = express.Router();
 
   // Get my stats
-  router.get("/me/stats", authenticateToken, (req, res, next) => {
+  router.get("/me/stats", authenticateToken, async (req, res, next) => {
     try {
-      const stats = statsService.getMyStats({
+      const stats = await statsService.getMyStats({
         userId: req.user.id,
         month: req.query.month,
       });
@@ -29,14 +29,14 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
   });
 
   // Get user stats
-  router.get("/users/:id/stats", authenticateToken, (req, res, next) => {
+  router.get("/users/:id/stats", authenticateToken, async (req, res, next) => {
     const userIdValidation = validateUserId(req.params.id);
     if (!userIdValidation.valid) {
       return res.status(400).json({ message: userIdValidation.error });
     }
 
     try {
-      const stats = statsService.getUserStats({
+      const stats = await statsService.getUserStats({
         userId: Number(req.params.id),
         month: req.query.month,
       });
@@ -47,9 +47,9 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
   });
 
   // Get leaderboard
-  router.get("/leaderboard", authenticateToken, (req, res, next) => {
+  router.get("/leaderboard", authenticateToken, async (req, res, next) => {
     try {
-      const leaderboard = statsService.getLeaderboard({
+      const leaderboard = await statsService.getLeaderboard({
         month: req.query.month,
       });
       res.json(leaderboard);
@@ -59,10 +59,10 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
   });
 
   // Get graph data for current user
-  router.get("/me/graphs", authenticateToken, (req, res, next) => {
+  router.get("/me/graphs", authenticateToken, async (req, res, next) => {
     try {
       const year = req.query.year ? Number(req.query.year) : undefined;
-      const data = statsService.getGraphData({
+      const data = await statsService.getGraphData({
         userId: req.user.id,
         year,
       });
@@ -73,7 +73,7 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
   });
 
   // Get graph data for another user
-  router.get("/users/:id/graphs", authenticateToken, (req, res, next) => {
+  router.get("/users/:id/graphs", authenticateToken, async (req, res, next) => {
     const userIdValidation = validateUserId(req.params.id);
     if (!userIdValidation.valid) {
       return res.status(400).json({ message: userIdValidation.error });
@@ -81,7 +81,7 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
 
     try {
       const year = req.query.year ? Number(req.query.year) : undefined;
-      const data = statsService.getGraphData({
+      const data = await statsService.getGraphData({
         userId: Number(req.params.id),
         year,
       });

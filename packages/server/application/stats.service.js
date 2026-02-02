@@ -1,5 +1,5 @@
 /**
- * Stats Service - Statistics use cases
+ * Stats Service - Statistics use cases (PostgreSQL)
  * Handles user stats, recap generation
  */
 
@@ -56,20 +56,20 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
    * Get stats for a user (internal helper)
    * @param {number} userId
    * @param {string|undefined} monthParam
-   * @returns {UserStatsResult}
+   * @returns {Promise<UserStatsResult>}
    */
-  function getUserStatsInternal(userId, monthParam) {
+  async function getUserStatsInternal(userId, monthParam) {
     const today = getToday();
     const { monthStart, monthEnd } = getMonthRange(monthParam);
 
-    const lastEntry = entryRepo.getLastByUser(userId);
-    const todayEntry = entryRepo.findByUserAndDate(userId, today);
-    const participationCount = entryRepo.countByUser(userId);
-    const currentMonthAvg = entryRepo.getAvgByUserAndRange(userId, monthStart, monthEnd);
-    const monthEntries = entryRepo.listByUserAndRange(userId, monthStart, monthEnd);
+    const lastEntry = await entryRepo.getLastByUser(userId);
+    const todayEntry = await entryRepo.findByUserAndDate(userId, today);
+    const participationCount = await entryRepo.countByUser(userId);
+    const currentMonthAvg = await entryRepo.getAvgByUserAndRange(userId, monthStart, monthEnd);
+    const monthEntries = await entryRepo.listByUserAndRange(userId, monthStart, monthEnd);
 
     // Calculate streak
-    const allEntries = entryRepo.listAllByUser(userId);
+    const allEntries = await entryRepo.listAllByUser(userId);
     const streakData = calculateStreak(allEntries, today);
 
     return {
@@ -92,25 +92,25 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get stats for current user
      * @param {{ userId: number, month?: string }} params
-     * @returns {UserStatsResult}
+     * @returns {Promise<UserStatsResult>}
      */
-    getMyStats({ userId, month }) {
+    async getMyStats({ userId, month }) {
       return getUserStatsInternal(userId, month);
     },
 
     /**
      * Get stats for another user
      * @param {{ userId: number, month?: string }} params
-     * @returns {UserStatsResult & { user: { id: number, username: string } }}
+     * @returns {Promise<UserStatsResult & { user: { id: number, username: string } }>}
      * @throws {NotFoundError} If user doesn't exist
      */
-    getUserStats({ userId, month }) {
-      const user = userRepo.findById(userId);
+    async getUserStats({ userId, month }) {
+      const user = await userRepo.findById(userId);
       if (!user) {
         throw new NotFoundError("User not found");
       }
 
-      const stats = getUserStatsInternal(userId, month);
+      const stats = await getUserStatsInternal(userId, month);
 
       return {
         user,
@@ -121,16 +121,16 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get daily recap (for bot)
      * @param {{ date?: string }} params
-     * @returns {RecapResult}
+     * @returns {Promise<RecapResult>}
      */
-    getRecap({ date } = {}) {
+    async getRecap({ date } = {}) {
       const recapDate = date || getToday();
 
       // Get entries with user info
-      const entries = entryRepo.listByDateWithUsers(recapDate);
+      const entries = await entryRepo.listByDateWithUsers(recapDate);
 
       // Get ratings count
-      const ratingsCount = ratingRepo.countByDate(recapDate);
+      const ratingsCount = await ratingRepo.countByDate(recapDate);
 
       // Calculate stats via domain
       const stats = calculateRecapStats(entries, ratingsCount);
@@ -145,19 +145,19 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
 
     /**
      * List all users
-     * @returns {{ id: number, username: string }[]}
+     * @returns {Promise<{ id: number, username: string }[]>}
      */
-    listUsers() {
+    async listUsers() {
       return userRepo.listAll();
     },
 
     /**
      * Check if a user exists by username
      * @param {{ username: string }} params
-     * @returns {{ exists: boolean, user: { id: number, username: string }|null }}
+     * @returns {Promise<{ exists: boolean, user: { id: number, username: string }|null }>}
      */
-    checkUserExists({ username }) {
-      const user = userRepo.findByUsername(username);
+    async checkUserExists({ username }) {
+      const user = await userRepo.findByUsername(username);
       return {
         exists: !!user,
         user: user || null,
@@ -167,14 +167,14 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get leaderboard data
      * @param {{ month?: string }} params
-     * @returns {{ monthly: Array, allTime: Array, topParticipants: Array, monthLabel: string }}
+     * @returns {Promise<{ monthly: Array, allTime: Array, topParticipants: Array, monthLabel: string }>}
      */
-    getLeaderboard({ month } = {}) {
+    async getLeaderboard({ month } = {}) {
       const { monthStart, monthEnd } = getMonthRange(month);
 
-      const monthly = entryRepo.getLeaderboardByAvg(monthStart, monthEnd);
-      const allTime = entryRepo.getLeaderboardAllTime();
-      const topParticipants = entryRepo.getLeaderboardByParticipation();
+      const monthly = await entryRepo.getLeaderboardByAvg(monthStart, monthEnd);
+      const allTime = await entryRepo.getLeaderboardAllTime();
+      const topParticipants = await entryRepo.getLeaderboardByParticipation();
 
       return {
         monthStart,
@@ -188,28 +188,28 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get graph data for a user
      * @param {{ userId: number, year?: number }} params
-     * @returns {Object} Graph data including monthly trends, heatmap, distribution
+     * @returns {Promise<Object>} Graph data including monthly trends, heatmap, distribution
      */
-    getGraphData({ userId, year }) {
+    async getGraphData({ userId, year }) {
       const currentYear = year || new Date().getFullYear();
 
       // Monthly averages for the user (last 12 months)
-      const userMonthly = entryRepo.getMonthlyAverages(userId, 12);
+      const userMonthly = await entryRepo.getMonthlyAverages(userId, 12);
 
       // Global monthly averages for comparison
-      const globalMonthly = entryRepo.getGlobalMonthlyAverages(12);
+      const globalMonthly = await entryRepo.getGlobalMonthlyAverages(12);
 
       // Year entries for heatmap
-      const yearEntries = entryRepo.getYearEntries(userId, currentYear);
+      const yearEntries = await entryRepo.getYearEntries(userId, currentYear);
 
       // Rating distribution
-      const distribution = entryRepo.getRatingDistribution(userId);
+      const distribution = await entryRepo.getRatingDistribution(userId);
 
       // Average by day of week
-      const byDayOfWeek = entryRepo.getAverageByDayOfWeek(userId);
+      const byDayOfWeek = await entryRepo.getAverageByDayOfWeek(userId);
 
       // Global average for comparison
-      const globalAverage = entryRepo.getGlobalAverage();
+      const globalAverage = await entryRepo.getGlobalAverage();
 
       return {
         year: currentYear,
@@ -225,9 +225,9 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get weekly recap (for bot)
      * @param {{ date?: string }} params - Optional end date (defaults to today)
-     * @returns {Object} Weekly recap data
+     * @returns {Promise<Object>} Weekly recap data
      */
-    getWeeklyRecap({ date } = {}) {
+    async getWeeklyRecap({ date } = {}) {
       const endDate = date || getToday();
       const endDateObj = new Date(endDate);
 
@@ -239,7 +239,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       const startDate = startDateObj.toISOString().split("T")[0];
 
       // Get all entries for the week
-      const weeklyLeaderboard = entryRepo.getLeaderboardByAvg(startDate, endDate);
+      const weeklyLeaderboard = await entryRepo.getLeaderboardByAvg(startDate, endDate);
 
       // Calculate totals
       let totalRating = 0;
@@ -250,7 +250,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       // For each day in the week, get entries
       for (let d = new Date(startDate); d <= endDateObj; d.setDate(d.getDate() + 1)) {
         const dayStr = d.toISOString().split("T")[0];
-        const dayEntries = entryRepo.listByDateWithUsers(dayStr);
+        const dayEntries = await entryRepo.listByDateWithUsers(dayStr);
 
         if (dayEntries.length > 0) {
           activeDays.add(dayStr);
@@ -264,11 +264,11 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
 
       const avgRating = totalEntries > 0 ? totalRating / totalEntries : 0;
 
-      // Format leaderboard
+      // Format leaderboard (note: PostgreSQL returns lowercase column names)
       const leaderboard = weeklyLeaderboard.map((entry) => ({
         username: entry.username,
-        avgRating: entry.avgRating,
-        entries: entry.entryCount,
+        avgRating: parseFloat(entry.avgrating),
+        entries: parseInt(entry.entrycount, 10),
       }));
 
       logger?.debug("Weekly recap récupéré", {
@@ -290,10 +290,10 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get user recap stats by username (for bot)
      * @param {{ username: string }} params
-     * @returns {Object} User stats
+     * @returns {Promise<Object>} User stats
      */
-    getUserRecapStats({ username }) {
-      const user = userRepo.findByUsername(username);
+    async getUserRecapStats({ username }) {
+      const user = await userRepo.findByUsername(username);
       if (!user) {
         throw new NotFoundError("User not found");
       }
@@ -304,9 +304,9 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     /**
      * Get recap history (for bot)
      * @param {{ limit?: number }} params
-     * @returns {Array} Last N recaps
+     * @returns {Promise<Array>} Last N recaps
      */
-    getRecapHistory({ limit = 5 } = {}) {
+    async getRecapHistory({ limit = 5 } = {}) {
       const today = getToday();
       const history = [];
 
@@ -317,10 +317,10 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
 
       while (history.length < limit && daysChecked < maxDaysToCheck) {
         const dateStr = dateObj.toISOString().split("T")[0];
-        const entries = entryRepo.listByDateWithUsers(dateStr);
+        const entries = await entryRepo.listByDateWithUsers(dateStr);
 
         if (entries.length > 0) {
-          const ratingsCount = ratingRepo.countByDate(dateStr);
+          const ratingsCount = await ratingRepo.countByDate(dateStr);
           const stats = calculateRecapStats(entries, ratingsCount);
 
           history.push({

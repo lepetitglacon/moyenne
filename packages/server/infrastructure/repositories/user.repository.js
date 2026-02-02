@@ -1,6 +1,6 @@
 /**
- * User Repository - Data access layer for users table
- * Factory pattern with db injection
+ * User Repository - Data access layer for users table (PostgreSQL)
+ * Factory pattern with pool injection
  */
 
 /**
@@ -12,75 +12,85 @@
 
 /**
  * Create a user repository instance
- * @param {import('better-sqlite3').Database} db - SQLite database instance
+ * @param {import('pg').Pool} pool - PostgreSQL pool instance
  */
-export function createUserRepository(db) {
+export function createUserRepository(pool) {
   return {
     /**
      * Find user by username (includes password hash for auth)
      * @param {string} username
-     * @returns {User|undefined}
+     * @returns {Promise<User|undefined>}
      */
-    findByUsernameWithPassword(username) {
-      return db
-        .prepare("SELECT * FROM users WHERE username = ?")
-        .get(username);
+    async findByUsernameWithPassword(username) {
+      const result = await pool.query(
+        "SELECT * FROM users WHERE username = $1",
+        [username]
+      );
+      return result.rows[0];
     },
 
     /**
      * Find user by username (public info only)
      * @param {string} username
-     * @returns {User|undefined}
+     * @returns {Promise<User|undefined>}
      */
-    findByUsername(username) {
-      return db
-        .prepare("SELECT id, username FROM users WHERE username = ?")
-        .get(username);
+    async findByUsername(username) {
+      const result = await pool.query(
+        "SELECT id, username FROM users WHERE username = $1",
+        [username]
+      );
+      return result.rows[0];
     },
 
     /**
      * Find user by ID
      * @param {number} id
-     * @returns {User|undefined}
+     * @returns {Promise<User|undefined>}
      */
-    findById(id) {
-      return db
-        .prepare("SELECT id, username FROM users WHERE id = ?")
-        .get(id);
+    async findById(id) {
+      const result = await pool.query(
+        "SELECT id, username FROM users WHERE id = $1",
+        [id]
+      );
+      return result.rows[0];
     },
 
     /**
      * Check if username exists
      * @param {string} username
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
-    existsByUsername(username) {
-      const row = db
-        .prepare("SELECT id FROM users WHERE username = ?")
-        .get(username);
-      return !!row;
+    async existsByUsername(username) {
+      const result = await pool.query(
+        "SELECT id FROM users WHERE username = $1",
+        [username]
+      );
+      return result.rows.length > 0;
     },
 
     /**
      * Create a new user
      * @param {string} username
      * @param {string} passwordHash - Already hashed password
-     * @returns {import('better-sqlite3').RunResult}
+     * @returns {Promise<{ lastInsertRowid: number }>}
      */
-    create(username, passwordHash) {
-      return db
-        .prepare("INSERT INTO users (username, password) VALUES (?, ?)")
-        .run(username, passwordHash);
+    async create(username, passwordHash) {
+      const result = await pool.query(
+        "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id",
+        [username, passwordHash]
+      );
+      return { lastInsertRowid: result.rows[0].id };
     },
 
     /**
      * List all users sorted alphabetically
-     * @returns {User[]}
+     * @returns {Promise<User[]>}
      */
-    listAll() {
-      return db
-        .prepare("SELECT id, username FROM users ORDER BY username COLLATE NOCASE ASC")
-        .all();
+    async listAll() {
+      const result = await pool.query(
+        "SELECT id, username FROM users ORDER BY LOWER(username) ASC"
+      );
+      return result.rows;
     },
   };
 }
