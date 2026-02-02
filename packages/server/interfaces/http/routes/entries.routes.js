@@ -14,12 +14,22 @@ import express from "express";
 export function createEntriesRoutes({ entryService, authenticateToken }) {
   const router = express.Router();
 
+  // Get today's entry (for editing)
+  router.get("/entries/today", authenticateToken, async (req, res, next) => {
+    try {
+      const entry = await entryService.getTodayEntry({ userId: req.user.id });
+      res.json(entry || { exists: false });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Add entry
   router.post("/entries", authenticateToken, async (req, res, next) => {
     try {
-      const { rating, description } = req.body;
-      await entryService.saveEntry({ userId: req.user.id, rating, description });
-      res.json({ message: "Saved" });
+      const { rating, description, tags } = req.body;
+      const result = await entryService.saveEntry({ userId: req.user.id, rating, description, tags });
+      res.json({ message: "Saved", newBadges: result.newBadges || [] });
     } catch (err) {
       next(err);
     }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import NavMenu from "../components/NavMenu.vue";
+import TagSelector from "../components/TagSelector.vue";
 import { useFlow } from "../composables/useFlow";
 import { useAuth } from "../composables/useAuth";
 
@@ -13,28 +14,32 @@ const { dayScore, dayComment } = useFlow();
 
 const error = ref<string | null>(null);
 const saving = ref(false);
+const loading = ref(true);
+const selectedTags = ref<string[]>([]);
+const showTags = ref(false);
+const newBadges = ref<string[]>([]);
 
 const moodLabels = [
-  "J'AURAIS PRÉFÉRÉE CREVER",
+  "J'AURAIS PREFERE CREVER",
   "S'IL VOUS PLAIT, BUTEZ MOI",
   "AU FOND DU TROU",
-  "J’AI EXISTÉ PAR ERREUR",
-  "MA MOTIVATION EST DÉCÉDÉE",
-  "C’EST UN CRI À L’AIDE",
+  "J'AI EXISTE PAR ERREUR",
+  "MA MOTIVATION EST DECEDEE",
+  "C'EST UN CRI A L'AIDE",
   "JE SURVIS PAR HABITUDE",
   "PAS MORT MAIS PAS VIVANT",
-  "ÉMOTIONNELLEMENT EN MODE AVION",
+  "EMOTIONNELLEMENT EN MODE AVION",
   "TU VOIS CE QUE JE VEUX DIRE ?",
   "NEUTRE COMME UN MUR BLANC",
-  "LÉGÈREMENT MOINS MALHEUREUX",
-  "ÇA PASSE MAIS JE PORTE PLAINTE",
-  "J'AI DÛ CONFONDRE MES MÉDOCS",
-  "ÉTONNAMMENT FONCTIONNEL",
-  "ALERTE : J'AI RESSENTI UNE ÉMOTION POSITIVE",
-  "J’AI RESSENTI UN MICRO-BONHEUR",
-  "ÇA COMMENCE À ME PLAIRE",
-  "JOURNÉE ILLÉGALEMENT BIEN",
-  "C'EST LOUCHE, JE VAIS FORCÉMENT LE PAYER CHER",
+  "LEGEREMENT MOINS MALHEUREUX",
+  "CA PASSE MAIS JE PORTE PLAINTE",
+  "J'AI DU CONFONDRE MES MEDOCS",
+  "ETONNAMMENT FONCTIONNEL",
+  "ALERTE : J'AI RESSENTI UNE EMOTION POSITIVE",
+  "J'AI RESSENTI UN MICRO-BONHEUR",
+  "CA COMMENCE A ME PLAIRE",
+  "JOURNEE ILLEGALEMENT BIEN",
+  "C'EST LOUCHE, JE VAIS FORCEMENT LE PAYER CHER",
   "ORGASMIQUE",
 ] as const;
 
@@ -49,15 +54,45 @@ const dateLabel = computed(() => {
   return d.toLocaleDateString("fr-FR", opts);
 });
 
-// ✅ validation: commentaire obligatoire (on trim pour ignorer les espaces)
+// Validation: commentaire obligatoire
 const canContinue = computed(() => dayComment.value.trim().length > 0);
+
+// Badge name mapping
+const badgeNames: Record<string, { name: string; icon: string }> = {
+  streak_7: { name: "7 jours de suite", icon: "🔥" },
+  streak_30: { name: "Mois parfait", icon: "🏆" },
+  perfect_20: { name: "Note parfaite!", icon: "⭐" },
+  reviewer_100: { name: "Reviewer", icon: "📝" },
+  top_1_monthly: { name: "Top 1", icon: "🥇" },
+};
+
+// Load today's entry if exists (for editing)
+onMounted(async () => {
+  loading.value = true;
+  try {
+    const res = await authFetch("/api/entries/today");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.exists) {
+        dayScore.value = data.rating || 0;
+        dayComment.value = data.description || "";
+        selectedTags.value = data.tags || [];
+      }
+    }
+  } catch {
+    // Ignore errors - user will start fresh
+  } finally {
+    loading.value = false;
+  }
+});
 
 async function next() {
   error.value = null;
+  newBadges.value = [];
 
-  // ✅ bloquer si commentaire vide
+  // Bloquer si commentaire vide
   if (!canContinue.value) {
-    error.value = "Merci d’écrire un commentaire avant de continuer.";
+    error.value = "Merci d'ecrire un commentaire avant de continuer.";
     return;
   }
 
@@ -69,6 +104,7 @@ async function next() {
       body: JSON.stringify({
         rating: dayScore.value,
         description: dayComment.value.trim(),
+        tags: selectedTags.value,
       }),
     });
 
@@ -77,12 +113,27 @@ async function next() {
       throw new Error(data?.message || "Erreur lors de la sauvegarde.");
     }
 
-    await router.push({ name: "noterAutre" });
+    const result = await res.json();
+
+    // Check for new badges
+    if (result.newBadges && result.newBadges.length > 0) {
+      newBadges.value = result.newBadges;
+      // Show badges briefly then navigate
+      setTimeout(() => {
+        router.push({ name: "noterAutre" });
+      }, 2500);
+    } else {
+      await router.push({ name: "noterAutre" });
+    }
   } catch (e: any) {
     error.value = e?.message ?? "Impossible de sauvegarder.";
   } finally {
     saving.value = false;
   }
+}
+
+function toggleTagSection() {
+  showTags.value = !showTags.value;
 }
 </script>
 
@@ -91,37 +142,240 @@ async function next() {
     <div class="page-center">
       <img class="brand-logo" src="../assets/img/tilt.png" alt="tilt" />
 
-      <div class="step-title">Note du {{ dateLabel }}</div>
-
-      <div class="step-value" :class="{ 'step-value--glow': dayScore > 15 }">
-        {{ moodText }}
+      <!-- New badges celebration -->
+      <div v-if="newBadges.length > 0" class="badge-celebration">
+        <div class="celebration-title">🎉 Nouveau badge!</div>
+        <div class="badge-item" v-for="badgeId in newBadges" :key="badgeId">
+          <span class="badge-icon">{{ badgeNames[badgeId]?.icon || '🏅' }}</span>
+          <span class="badge-name">{{ badgeNames[badgeId]?.name || badgeId }}</span>
+        </div>
       </div>
 
-      <input class="range" type="range" min="0" max="20" v-model.number="dayScore" />
+      <template v-if="!newBadges.length">
+        <div v-if="loading" class="loading-msg">Chargement...</div>
 
-      <div class="step-subtitle">Commentaire sur ma journée</div>
+        <template v-else>
+          <div class="step-title">Note du {{ dateLabel }}</div>
 
-      <textarea
-        class="textarea"
-        rows="6"
-        v-model="dayComment"
-        placeholder="Écris un commentaire..."
-        @input="error = null"
-      />
+          <div class="step-value" :class="{ 'step-value--glow': dayScore > 15 }">
+            {{ moodText }}
+          </div>
 
-      <button
-        class="btn btn-primary btn-wide"
-        type="button"
-        @click="next"
-        :disabled="saving || !canContinue"
-        :title="!canContinue ? 'Écris un commentaire pour continuer' : ''"
-      >
-        {{ saving ? "SAUVEGARDE..." : "CONTINUER" }}
-      </button>
+          <input class="range" type="range" min="0" max="20" v-model.number="dayScore" />
 
-      <p v-if="error" class="form-error">{{ error }}</p>
+          <!-- Tags toggle button -->
+          <button
+            type="button"
+            class="tags-toggle"
+            :class="{ 'tags-toggle--active': showTags || selectedTags.length > 0 }"
+            @click="toggleTagSection"
+          >
+            <span class="tags-toggle-icon">🏷️</span>
+            <span class="tags-toggle-text">
+              {{ selectedTags.length > 0 ? `${selectedTags.length} facteur(s)` : 'Ajouter des facteurs' }}
+            </span>
+            <span class="tags-toggle-arrow">{{ showTags ? '▲' : '▼' }}</span>
+          </button>
+
+          <!-- Tags section -->
+          <div v-if="showTags" class="tags-section">
+            <TagSelector v-model="selectedTags" />
+          </div>
+
+          <!-- Selected tags preview (when section is collapsed) -->
+          <div v-if="!showTags && selectedTags.length > 0" class="selected-tags-preview">
+            <span
+              v-for="tagId in selectedTags.slice(0, 5)"
+              :key="tagId"
+              class="preview-tag"
+            >
+              {{ tagId }}
+            </span>
+            <span v-if="selectedTags.length > 5" class="preview-more">
+              +{{ selectedTags.length - 5 }}
+            </span>
+          </div>
+
+          <div class="step-subtitle">Commentaire sur ma journee</div>
+
+          <textarea
+            class="textarea"
+            rows="5"
+            v-model="dayComment"
+            placeholder="Ecris un commentaire..."
+            @input="error = null"
+          />
+
+          <button
+            class="btn btn-primary btn-wide"
+            type="button"
+            @click="next"
+            :disabled="saving || !canContinue"
+            :title="!canContinue ? 'Ecris un commentaire pour continuer' : ''"
+          >
+            {{ saving ? "SAUVEGARDE..." : "CONTINUER" }}
+          </button>
+
+          <p v-if="error" class="form-error">{{ error }}</p>
+        </template>
+      </template>
 
       <NavMenu />
     </div>
   </AppShell>
 </template>
+
+<style scoped>
+.loading-msg {
+  text-align: center;
+  padding: 20px;
+  opacity: 0.7;
+}
+
+.tags-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 16px;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.tags-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tags-toggle--active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tags-toggle-icon {
+  font-size: 16px;
+}
+
+.tags-toggle-text {
+  flex: 1;
+}
+
+.tags-toggle-arrow {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.tags-section {
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 16px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selected-tags-preview {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  max-width: 320px;
+}
+
+.preview-tag {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  opacity: 0.7;
+}
+
+.preview-more {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Badge celebration */
+.badge-celebration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  animation: celebrationPop 0.5s ease;
+}
+
+@keyframes celebrationPop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.celebration-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.badge-celebration .badge-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 180, 0, 0.1));
+  border: 2px solid rgba(255, 215, 0, 0.5);
+  border-radius: 16px;
+  animation: badgeShine 2s ease infinite;
+}
+
+@keyframes badgeShine {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+  }
+}
+
+.badge-celebration .badge-icon {
+  font-size: 40px;
+}
+
+.badge-celebration .badge-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+</style>

@@ -16,6 +16,7 @@ import { NotFoundError } from "../shared/errors.js";
  * @property {import('../infrastructure/repositories/user.repository.js').UserRepository} userRepo
  * @property {import('../infrastructure/repositories/entry.repository.js').EntryRepository} entryRepo
  * @property {import('../infrastructure/repositories/rating.repository.js').RatingRepository} ratingRepo
+ * @property {import('./badge.service.js').BadgeService} [badgeService]
  * @property {import('../logger.js').Logger} [logger]
  */
 
@@ -51,7 +52,7 @@ import { NotFoundError } from "../shared/errors.js";
  * Create stats service instance
  * @param {StatsDependencies} deps
  */
-export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) {
+export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeService, logger }) {
   /**
    * Get stats for a user (internal helper)
    * @param {number} userId
@@ -120,7 +121,21 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
      * @returns {Promise<UserStatsResult>}
      */
     async getMyStats({ userId, month }) {
-      return getUserStatsInternal(userId, month);
+      const stats = await getUserStatsInternal(userId, month);
+
+      // Get badges and progress
+      let badges = [];
+      let badgeProgress = {};
+      if (badgeService) {
+        badges = await badgeService.getUserBadges(userId);
+        badgeProgress = await badgeService.getBadgeProgress(userId, stats.streak.currentStreak);
+      }
+
+      return {
+        ...stats,
+        badges,
+        badgeProgress,
+      };
     },
 
     /**
@@ -137,9 +152,16 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
 
       const stats = await getUserStatsInternal(userId, month);
 
+      // Get badges
+      let badges = [];
+      if (badgeService) {
+        badges = await badgeService.getUserBadges(userId);
+      }
+
       return {
         user,
         ...stats,
+        badges,
       };
     },
 
@@ -172,6 +194,12 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       return {
         date: recapDate,
         ...stats,
+        // Include full entries array for FULL display mode
+        entries: entries.map(e => ({
+          username: e.username,
+          rating: e.rating,
+          description: e.description || null,
+        })),
       };
     },
 

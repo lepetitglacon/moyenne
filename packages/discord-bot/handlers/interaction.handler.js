@@ -16,6 +16,14 @@ function createInteractionHandler({ recapHandler, logger }) {
     async handle(interaction, client) {
       if (!interaction.isChatInputCommand()) return;
 
+      const subcommand = interaction.options.getSubcommand(false);
+      logger?.info("Commande reçue", {
+        command: interaction.commandName,
+        subcommand,
+        user: interaction.user.tag,
+        guild: interaction.guild?.name,
+      });
+
       switch (interaction.commandName) {
         case "recap":
           await recapHandler.handle(interaction, client);

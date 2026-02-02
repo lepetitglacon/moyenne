@@ -46,5 +46,18 @@ export function createRatingRepository(pool) {
       );
       return parseInt(result.rows[0]?.count ?? 0, 10);
     },
+
+    /**
+     * Count total ratings given by a user (all time)
+     * @param {number} userId
+     * @returns {Promise<number>}
+     */
+    async countByUser(userId) {
+      const result = await pool.query(
+        "SELECT COUNT(*) as count FROM ratings WHERE from_user_id = $1",
+        [userId]
+      );
+      return parseInt(result.rows[0]?.count ?? 0, 10);
+    },
   };
 }

@@ -15,6 +15,20 @@ type YearEntry = { date: string; rating: number };
 type Distribution = { rating: number; count: number };
 type DayOfWeek = { dayOfWeek: number; avgRating: number; entryCount: number };
 
+type Badge = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  earnedAt: string;
+};
+
+type BadgeProgress = {
+  current: number;
+  target: number;
+  percent: number;
+};
+
 type StatsPayload = {
   today: string;
   monthStart: string;
@@ -24,6 +38,9 @@ type StatsPayload = {
   participationCount: number;
   currentMonthAvg: number | null;
   monthEntries: MonthEntry[];
+  streak: { currentStreak: number; longestStreak: number };
+  badges: Badge[];
+  badgeProgress: Record<string, BadgeProgress>;
 };
 
 type GraphPayload = {
@@ -301,6 +318,17 @@ const headerTitle = computed(() => {
   const u = users.value.find((x) => x.id === target.value);
   return u ? `Stats de ${u.username}` : "Statistiques";
 });
+
+// Badge name mapping
+const badgeNames: Record<string, string> = {
+  streak_7: "7 jours de suite",
+  streak_30: "Mois parfait",
+  reviewer_100: "Reviewer (100 notes)",
+};
+
+function getBadgeName(key: string): string {
+  return badgeNames[key] || key;
+}
 </script>
 
 <template>
@@ -352,18 +380,52 @@ const headerTitle = computed(() => {
             <div class="card">
               <div class="card-label">Participations</div>
               <div class="card-value">{{ stats.participationCount }}</div>
-              <div class="card-sub">jours notés</div>
+              <div class="card-sub">jours notes</div>
+            </div>
+            <div class="card card--streak">
+              <div class="card-label">Streak actuel</div>
+              <div class="card-value">
+                <span class="streak-icon">🔥</span>
+                {{ stats.streak?.currentStreak || 0 }}
+              </div>
+              <div class="card-sub">jours consecutifs</div>
             </div>
             <div class="card">
-              <div class="card-label">Dernière note</div>
+              <div class="card-label">Record streak</div>
               <div class="card-value">
-                <span v-if="stats.lastEntry">{{ stats.lastEntry.rating }}<small>/20</small></span>
-                <span v-else>—</span>
+                <span class="streak-icon">🏆</span>
+                {{ stats.streak?.longestStreak || 0 }}
+              </div>
+              <div class="card-sub">meilleur streak</div>
+            </div>
+          </div>
+
+          <!-- Badges Section -->
+          <div class="badges-section" v-if="stats.badges?.length || stats.badgeProgress">
+            <div class="section-title">🎖️ Badges</div>
+
+            <!-- Earned Badges -->
+            <div class="badges-earned" v-if="stats.badges?.length">
+              <div class="badge-item" v-for="badge in stats.badges" :key="badge.id" :title="badge.description">
+                <span class="badge-icon">{{ badge.icon }}</span>
+                <span class="badge-name">{{ badge.name }}</span>
               </div>
             </div>
-            <div class="card" v-if="graphs?.globalAverage !== null">
-              <div class="card-label">Moy. globale</div>
-              <div class="card-value">{{ graphs?.globalAverage }}<small>/20</small></div>
+            <div class="badges-empty" v-else>
+              <span>Aucun badge pour l'instant</span>
+            </div>
+
+            <!-- Badge Progress -->
+            <div class="badges-progress" v-if="stats.badgeProgress">
+              <div class="progress-item" v-for="(prog, key) in stats.badgeProgress" :key="key">
+                <div class="progress-header">
+                  <span class="progress-name">{{ getBadgeName(key) }}</span>
+                  <span class="progress-value">{{ prog.current }}/{{ prog.target }}</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${prog.percent}%` }"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -852,6 +914,90 @@ const headerTitle = computed(() => {
 .lb-user { flex: 1; font-weight: 700; font-size: 12px; }
 .lb-score { font-weight: 800; font-size: 12px; opacity: .9; }
 .lb-empty { text-align: center; opacity: .5; font-size: 12px; padding: 10px; }
+
+/* Streak card */
+.card--streak .card-value { color: #ff9500; }
+.streak-icon { font-size: 16px; margin-right: 4px; }
+
+/* Badges section */
+.badges-section {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.badges-earned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(255,215,0,.15), rgba(255,180,0,.1));
+  border: 1px solid rgba(255,215,0,.3);
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.badge-icon { font-size: 16px; }
+.badge-name { font-weight: 600; }
+
+.badges-empty {
+  text-align: center;
+  padding: 12px;
+  opacity: .5;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.badges-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-item {
+  background: rgba(255,255,255,.03);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.progress-name { font-size: 11px; font-weight: 600; opacity: .8; }
+.progress-value { font-size: 10px; opacity: .6; }
+
+.progress-bar {
+  height: 6px;
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff9500, #ffcc00);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
 
 @media (max-width: 768px) {
   .stats-cards { grid-template-columns: repeat(2, 1fr); }

@@ -9,7 +9,7 @@
  * - Once rated, the user cannot review again that day
  */
 
-import { getToday, getYesterday } from "../domain/index.js";
+import { getToday, getYesterday, calculateStreak } from "../domain/index.js";
 import { ValidationError } from "../shared/index.js";
 
 /**
@@ -17,6 +17,7 @@ import { ValidationError } from "../shared/index.js";
  * @property {import('../infrastructure/repositories/entry.repository.js').EntryRepository} entryRepo
  * @property {import('../infrastructure/repositories/rating.repository.js').RatingRepository} ratingRepo
  * @property {import('../infrastructure/repositories/assignment.repository.js').AssignmentRepository} assignmentRepo
+ * @property {import('./badge.service.js').BadgeService} [badgeService]
  * @property {import('../logger.js').Logger} [logger]
  */
 
@@ -38,24 +39,68 @@ import { ValidationError } from "../shared/index.js";
  * Create entry service instance
  * @param {EntryDependencies} deps
  */
-export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, logger }) {
+export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, badgeService, logger }) {
+  // Helper to normalize date for streak calculation
+  function normalizeDate(date) {
+    if (!date) return null;
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return String(date).split('T')[0];
+  }
+
   return {
     /**
      * Save or update an entry for today
-     * @param {{ userId: number, rating: number, description?: string }} params
-     * @returns {Promise<SaveEntryResult>}
+     * @param {{ userId: number, rating: number, description?: string, tags?: string[] }} params
+     * @returns {Promise<SaveEntryResult & { newBadges?: string[] }>}
      */
-    async saveEntry({ userId, rating, description }) {
+    async saveEntry({ userId, rating, description, tags = [] }) {
       const today = getToday();
-      const { isUpdate } = await entryRepo.upsert(userId, today, rating, description);
+      // Validate tags - only keep valid tag IDs
+      const validTags = Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : [];
+      const { isUpdate } = await entryRepo.upsert(userId, today, rating, description, validTags);
 
       if (isUpdate) {
-        logger?.debug("Entrée mise à jour", { userId, date: today, rating });
+        logger?.debug("Entree mise a jour", { userId, date: today, rating });
       } else {
-        logger?.info("Nouvelle entrée créée", { userId, date: today, rating });
+        logger?.info("Nouvelle entree creee", { userId, date: today, rating });
       }
 
-      return { isUpdate };
+      // Check and award badges
+      let newBadges = [];
+      if (badgeService) {
+        // Calculate streak for badge check
+        const allEntriesRaw = await entryRepo.listAllByUser(userId);
+        const allEntries = allEntriesRaw.map(e => ({ date: normalizeDate(e.date) }));
+        const streakInfo = calculateStreak(allEntries, today);
+
+        newBadges = await badgeService.checkAllBadgesAfterEntry(userId, rating, streakInfo);
+        if (newBadges.length > 0) {
+          logger?.info("Nouveaux badges attribues", { userId, badges: newBadges });
+        }
+      }
+
+      return { isUpdate, newBadges };
+    },
+
+    /**
+     * Get today's entry for a user
+     * @param {{ userId: number }} params
+     * @returns {Promise<{ exists: boolean, rating?: number, description?: string, tags?: string[] }>}
+     */
+    async getTodayEntry({ userId }) {
+      const today = getToday();
+      const entry = await entryRepo.findByUserAndDate(userId, today);
+
+      if (!entry) {
+        return { exists: false };
+      }
+
+      return {
+        exists: true,
+        rating: parseInt(entry.rating, 10) || 0,
+        description: entry.description || '',
+        tags: entry.tags || [],
+      };
     },
 
     /**
@@ -150,7 +195,18 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, logg
 
       // Save the rating
       await ratingRepo.create(fromUserId, toUserId, date, rating);
-      logger?.info("Rating enregistré", { fromUserId, toUserId, date, rating });
+      logger?.info("Rating enregistre", { fromUserId, toUserId, date, rating });
+
+      // Check and award reviewer badge
+      let newBadges = [];
+      if (badgeService) {
+        newBadges = await badgeService.checkAllBadgesAfterRating(fromUserId);
+        if (newBadges.length > 0) {
+          logger?.info("Nouveaux badges attribues", { userId: fromUserId, badges: newBadges });
+        }
+      }
+
+      return { newBadges };
     },
   };
 }

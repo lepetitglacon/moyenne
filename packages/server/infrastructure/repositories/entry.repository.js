@@ -45,17 +45,21 @@ export function createEntryRepository(pool) {
      * Get entry details by user ID and date
      * @param {number} userId
      * @param {string} date - YYYY-MM-DD
-     * @returns {Promise<{ date: string, rating: number, description: string|null }|undefined>}
+     * @returns {Promise<{ date: string, rating: number, description: string|null, tags: string[] }|undefined>}
      */
     async findByUserAndDate(userId, date) {
       const result = await pool.query(
-        `SELECT date, rating, description
+        `SELECT date, rating, description, COALESCE(tags, '[]') as tags
          FROM entries
          WHERE user_id = $1 AND date = $2
          LIMIT 1`,
         [userId, date]
       );
-      return result.rows[0];
+      const row = result.rows[0];
+      if (row) {
+        row.tags = Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]');
+      }
+      return row;
     },
 
     /**
@@ -64,12 +68,13 @@ export function createEntryRepository(pool) {
      * @param {string} date
      * @param {number} rating
      * @param {string|null} description
+     * @param {string[]} tags
      * @returns {Promise<{ rowCount: number }>}
      */
-    async insert(userId, date, rating, description) {
+    async insert(userId, date, rating, description, tags = []) {
       const result = await pool.query(
-        "INSERT INTO entries (user_id, date, rating, description) VALUES ($1, $2, $3, $4)",
-        [userId, date, rating, description]
+        "INSERT INTO entries (user_id, date, rating, description, tags) VALUES ($1, $2, $3, $4, $5)",
+        [userId, date, rating, description, JSON.stringify(tags)]
       );
       return { rowCount: result.rowCount };
     },
@@ -79,12 +84,13 @@ export function createEntryRepository(pool) {
      * @param {number} id - Entry ID
      * @param {number} rating
      * @param {string|null} description
+     * @param {string[]} tags
      * @returns {Promise<{ rowCount: number }>}
      */
-    async update(id, rating, description) {
+    async update(id, rating, description, tags = []) {
       const result = await pool.query(
-        "UPDATE entries SET rating = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3",
-        [rating, description, id]
+        "UPDATE entries SET rating = $1, description = $2, tags = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4",
+        [rating, description, JSON.stringify(tags), id]
       );
       return { rowCount: result.rowCount };
     },
@@ -95,15 +101,16 @@ export function createEntryRepository(pool) {
      * @param {string} date
      * @param {number} rating
      * @param {string|null} description
+     * @param {string[]} tags
      * @returns {Promise<{ isUpdate: boolean }>}
      */
-    async upsert(userId, date, rating, description) {
+    async upsert(userId, date, rating, description, tags = []) {
       const existing = await this.findIdByUserAndDate(userId, date);
       if (existing) {
-        await this.update(existing.id, rating, description);
+        await this.update(existing.id, rating, description, tags);
         return { isUpdate: true };
       } else {
-        await this.insert(userId, date, rating, description);
+        await this.insert(userId, date, rating, description, tags);
         return { isUpdate: false };
       }
     },
@@ -111,18 +118,22 @@ export function createEntryRepository(pool) {
     /**
      * Get last entry for a user (most recent by date)
      * @param {number} userId
-     * @returns {Promise<{ date: string, rating: number, description: string|null }|undefined>}
+     * @returns {Promise<{ date: string, rating: number, description: string|null, tags: string[] }|undefined>}
      */
     async getLastByUser(userId) {
       const result = await pool.query(
-        `SELECT date, rating, description
+        `SELECT date, rating, description, COALESCE(tags, '[]') as tags
          FROM entries
          WHERE user_id = $1
          ORDER BY date DESC
          LIMIT 1`,
         [userId]
       );
-      return result.rows[0];
+      const row = result.rows[0];
+      if (row) {
+        row.tags = Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]');
+      }
+      return row;
     },
 
     /**
@@ -228,14 +239,17 @@ export function createEntryRepository(pool) {
      */
     async listByDateWithUsers(date) {
       const result = await pool.query(
-        `SELECT e.*, u.username
+        `SELECT e.*, COALESCE(e.tags, '[]') as tags, u.username
          FROM entries e
          JOIN users u ON u.id = e.user_id
          WHERE e.date = $1
          ORDER BY e.rating DESC`,
         [date]
       );
-      return result.rows;
+      return result.rows.map(row => ({
+        ...row,
+        tags: Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]'),
+      }));
     },
 
     /**

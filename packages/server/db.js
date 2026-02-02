@@ -69,12 +69,23 @@ export const db = {
 };
 
 async function initDb() {
+  console.log('┌─────────────────────────────────────────────────────────────┐');
+  console.log('│                  DATABASE INITIALIZATION                    │');
+  console.log('└─────────────────────────────────────────────────────────────┘');
+
   try {
     // Test connection
-    await pool.query('SELECT NOW()');
-    console.log('✓ Connected to PostgreSQL database');
+    console.log('\n📡 Testing database connection...');
+    const now = await pool.query('SELECT NOW() as time');
+    console.log(`   ✓ Connected to PostgreSQL at ${now.rows[0].time}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // TABLES
+    // ═══════════════════════════════════════════════════════════════
+    console.log('\n📋 Creating tables...');
 
     // Users
+    console.log('   → Creating table: users');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -84,8 +95,10 @@ async function initDb() {
         last_login_at TIMESTAMP
       )
     `);
+    console.log('   ✓ Table users ready');
 
-    // Entries (1 entry per user per day)
+    // Entries
+    console.log('   → Creating table: entries');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS entries (
         id SERIAL PRIMARY KEY,
@@ -93,13 +106,16 @@ async function initDb() {
         date DATE NOT NULL,
         rating INTEGER NOT NULL CHECK (rating >= 0 AND rating <= 20),
         description TEXT,
+        tags JSONB DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, date)
       )
     `);
+    console.log('   ✓ Table entries ready');
 
-    // Review assignments (1 reviewer → 1 reviewee per day, exclusive)
+    // Review assignments
+    console.log('   → Creating table: review_assignments');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_assignments (
         id SERIAL PRIMARY KEY,
@@ -111,8 +127,10 @@ async function initDb() {
         UNIQUE(reviewee_id, date)
       )
     `);
+    console.log('   ✓ Table review_assignments ready');
 
     // Ratings
+    console.log('   → Creating table: ratings');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ratings (
         id SERIAL PRIMARY KEY,
@@ -124,8 +142,10 @@ async function initDb() {
         UNIQUE(from_user_id, to_user_id, date)
       )
     `);
+    console.log('   ✓ Table ratings ready');
 
     // User sessions
+    console.log('   → Creating table: user_sessions');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         id SERIAL PRIMARY KEY,
@@ -136,8 +156,10 @@ async function initDb() {
         user_agent TEXT
       )
     `);
+    console.log('   ✓ Table user_sessions ready');
 
-    // Event log
+    // Events
+    console.log('   → Creating table: events');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -147,27 +169,88 @@ async function initDb() {
         meta_json JSONB
       )
     `);
+    console.log('   ✓ Table events ready');
 
-    // Create indexes
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ratings_from_date ON ratings(from_user_id, date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ratings_to_date ON ratings(to_user_id, date)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_login ON user_sessions(user_id, login_at)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_type_at ON events(type, at)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_user_at ON events(user_id, at)`);
+    // User badges
+    console.log('   → Creating table: user_badges');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_badges (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        badge_type TEXT NOT NULL,
+        earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        UNIQUE(user_id, badge_type)
+      )
+    `);
+    console.log('   ✓ Table user_badges ready');
 
-    // Seed admin user if not exists
-    const admin = await pool.query("SELECT id FROM users WHERE username = $1", ["admin"]);
-    if (admin.rows.length === 0) {
-      const hashed = bcrypt.hashSync("admin123", 10);
-      await pool.query("INSERT INTO users (username, password) VALUES ($1, $2)", ["admin", hashed]);
-      console.log("Seed user created: admin / admin123");
+    // ═══════════════════════════════════════════════════════════════
+    // MIGRATIONS
+    // ═══════════════════════════════════════════════════════════════
+    console.log('\n🔄 Running migrations...');
+
+    // Migration: Add tags column to entries
+    console.log('   → Migration: Add tags column to entries');
+    const tagsColumnCheck = await pool.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'entries' AND column_name = 'tags'
+    `);
+    if (tagsColumnCheck.rows.length === 0) {
+      await pool.query(`ALTER TABLE entries ADD COLUMN tags JSONB DEFAULT '[]'`);
+      console.log('   ✓ Added tags column to entries');
+    } else {
+      console.log('   ✓ Tags column already exists');
     }
 
-    console.log('✓ Database initialized');
+    // ═══════════════════════════════════════════════════════════════
+    // INDEXES
+    // ═══════════════════════════════════════════════════════════════
+    console.log('\n📇 Creating indexes...');
+
+    const indexes = [
+      { name: 'idx_entries_date', table: 'entries', column: 'date' },
+      { name: 'idx_entries_user_date', table: 'entries', column: 'user_id, date' },
+      { name: 'idx_ratings_from_date', table: 'ratings', column: 'from_user_id, date' },
+      { name: 'idx_ratings_to_date', table: 'ratings', column: 'to_user_id, date' },
+      { name: 'idx_sessions_user_login', table: 'user_sessions', column: 'user_id, login_at' },
+      { name: 'idx_events_type_at', table: 'events', column: 'type, at' },
+      { name: 'idx_events_user_at', table: 'events', column: 'user_id, at' },
+      { name: 'idx_user_badges_user', table: 'user_badges', column: 'user_id' },
+      { name: 'idx_assignments_date', table: 'review_assignments', column: 'date' },
+    ];
+
+    for (const idx of indexes) {
+      console.log(`   → Creating index: ${idx.name}`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${idx.name} ON ${idx.table}(${idx.column})`);
+    }
+    console.log(`   ✓ ${indexes.length} indexes ready`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // SEED DATA
+    // ═══════════════════════════════════════════════════════════════
+    console.log('\n🌱 Checking seed data...');
+
+    const admin = await pool.query("SELECT id FROM users WHERE username = $1", ["admin"]);
+    if (admin.rows.length === 0) {
+      console.log('   → Creating admin user');
+      const hashed = bcrypt.hashSync("admin123", 10);
+      await pool.query("INSERT INTO users (username, password) VALUES ($1, $2)", ["admin", hashed]);
+      console.log('   ✓ Admin user created (admin / admin123)');
+    } else {
+      console.log('   ✓ Admin user already exists');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SUMMARY
+    // ═══════════════════════════════════════════════════════════════
+    console.log('\n┌─────────────────────────────────────────────────────────────┐');
+    console.log('│              ✓ DATABASE INITIALIZATION COMPLETE             │');
+    console.log('└─────────────────────────────────────────────────────────────┘\n');
+
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('\n❌ DATABASE INITIALIZATION ERROR:', error.message);
+    console.error('   Stack:', error.stack);
     throw error;
   }
 }
