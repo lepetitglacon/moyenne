@@ -1,32 +1,36 @@
 /**
- * User link repository - Database operations for Discord-Tilt user links
+ * User link repository - Database operations for Discord-Tilt user links (PostgreSQL)
  */
 
 /**
- * @param {import("better-sqlite3").Database} db
+ * @param {import("pg").Pool} pool - PostgreSQL pool
  */
-function createUserLinkRepository(db) {
+function createUserLinkRepository(pool) {
   return {
-    link(discordId, tiltUsername) {
-      db.prepare(`
-        INSERT INTO user_links (discord_id, tilt_username)
-        VALUES (?, ?)
-        ON CONFLICT(discord_id) DO UPDATE SET tilt_username = excluded.tilt_username
-      `).run(discordId, tiltUsername);
+    async link(discordId, tiltUsername) {
+      await pool.query(
+        `INSERT INTO user_links (discord_id, tilt_username)
+         VALUES ($1, $2)
+         ON CONFLICT(discord_id) DO UPDATE SET tilt_username = EXCLUDED.tilt_username`,
+        [discordId, tiltUsername]
+      );
     },
 
-    findByDiscordId(discordId) {
-      return db.prepare(
-        "SELECT * FROM user_links WHERE discord_id = ?"
-      ).get(discordId);
+    async findByDiscordId(discordId) {
+      const result = await pool.query(
+        "SELECT * FROM user_links WHERE discord_id = $1",
+        [discordId]
+      );
+      return result.rows[0];
     },
 
-    findAll() {
-      return db.prepare("SELECT * FROM user_links").all();
+    async findAll() {
+      const result = await pool.query("SELECT * FROM user_links");
+      return result.rows;
     },
 
-    unlink(discordId) {
-      db.prepare("DELETE FROM user_links WHERE discord_id = ?").run(discordId);
+    async unlink(discordId) {
+      await pool.query("DELETE FROM user_links WHERE discord_id = $1", [discordId]);
     },
   };
 }

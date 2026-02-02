@@ -43,11 +43,11 @@ function createReminderService({ configRepo, scheduleService, logger }) {
      * Start the reminder scheduler
      * @param {import("discord.js").Client} client - Discord client
      */
-    start(client) {
+    async start(client) {
       // Stop existing task if any
       this.stop();
 
-      const config = configRepo.get();
+      const config = await configRepo.get();
 
       if (!config || !config.reminder_enabled) {
         logger?.info("Reminder non démarré (désactivé)");
@@ -75,7 +75,7 @@ function createReminderService({ configRepo, scheduleService, logger }) {
         cronExpression,
         async () => {
           // Check if today is active
-          if (!scheduleService.isTodayActive()) {
+          if (!(await scheduleService.isTodayActive())) {
             logger?.info("Jour non actif, reminder ignoré");
             return;
           }
@@ -105,7 +105,7 @@ function createReminderService({ configRepo, scheduleService, logger }) {
      */
     async sendReminder(client) {
       try {
-        const config = configRepo.get();
+        const config = await configRepo.get();
 
         if (!config?.channel_id) {
           logger?.warn("Impossible d'envoyer le reminder: pas de canal");

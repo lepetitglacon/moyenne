@@ -13,7 +13,7 @@ require("dotenv").config();
 
 const { Client, GatewayIntentBits, REST, Routes } = require("discord.js");
 const config = require("./config");
-const { db, initDb } = require("./db");
+const { pool, initDb } = require("./db");
 const { Logger, logger } = require("./logger");
 const apiClient = require("./api");
 
@@ -45,11 +45,11 @@ async function main() {
   }
 
   // Initialize database
-  initDb();
+  await initDb();
 
   // Initialize repositories
-  const configRepo = createConfigRepository(db);
-  const userLinkRepo = createUserLinkRepository(db);
+  const configRepo = createConfigRepository(pool);
+  const userLinkRepo = createUserLinkRepository(pool);
 
   // Initialize loggers
   const logSchedule = new Logger("Schedule");

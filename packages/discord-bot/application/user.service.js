@@ -38,8 +38,8 @@ function createUserService({ userLinkRepo, apiClient, logger }) {
      * Unlink a Discord user from Tilt
      * @throws {NotFoundError} If no link exists
      */
-    unlink(discordId) {
-      const existing = userLinkRepo.findByDiscordId(discordId);
+    async unlink(discordId) {
+      const existing = await userLinkRepo.findByDiscordId(discordId);
 
       if (!existing) {
         throw new NotFoundError(
@@ -48,7 +48,7 @@ function createUserService({ userLinkRepo, apiClient, logger }) {
         );
       }
 
-      userLinkRepo.unlink(discordId);
+      await userLinkRepo.unlink(discordId);
       logger?.info("Compte délié", { discordId });
     },
 
@@ -56,8 +56,8 @@ function createUserService({ userLinkRepo, apiClient, logger }) {
      * Get all user links (for recap mentions)
      * @returns {Map<string, string>} Map of lowercase tiltUsername -> discordId
      */
-    getAllLinksMap() {
-      const links = userLinkRepo.findAll();
+    async getAllLinksMap() {
+      const links = await userLinkRepo.findAll();
       return new Map(
         links.map((l) => [l.tilt_username.toLowerCase(), l.discord_id])
       );
@@ -68,8 +68,8 @@ function createUserService({ userLinkRepo, apiClient, logger }) {
      * @param {string} discordId
      * @returns {string|null} Tilt username or null if not linked
      */
-    getLinkedUsername(discordId) {
-      const link = userLinkRepo.findByDiscordId(discordId);
+    async getLinkedUsername(discordId) {
+      const link = await userLinkRepo.findByDiscordId(discordId);
       return link?.tilt_username || null;
     },
   };

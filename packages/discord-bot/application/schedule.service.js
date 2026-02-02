@@ -94,8 +94,8 @@ function createScheduleService({ configRepo, logger }) {
     /**
      * Get current schedule configuration
      */
-    getStatus() {
-      const config = configRepo.get();
+    async getStatus() {
+      const config = await configRepo.get();
       return {
         channelId: config?.channel_id || null,
         enabled: Boolean(config?.enabled),
@@ -108,8 +108,8 @@ function createScheduleService({ configRepo, logger }) {
     /**
      * Configure the recap channel
      */
-    setChannel({ channelId, guildId }) {
-      configRepo.update({
+    async setChannel({ channelId, guildId }) {
+      await configRepo.update({
         channel_id: channelId,
         guild_id: guildId,
       });
@@ -120,13 +120,13 @@ function createScheduleService({ configRepo, logger }) {
      * Set the recap time
      * @throws {ValidationError} If time format is invalid
      */
-    setTime(time) {
+    async setTime(time) {
       const result = validateTimeFormat(time);
       if (!result.valid) {
         throw new ValidationError(result.error);
       }
 
-      configRepo.update({ recap_time: result.normalized });
+      await configRepo.update({ recap_time: result.normalized });
       logger?.info("Heure configurée", { time: result.normalized });
 
       return result.normalized;
@@ -135,8 +135,8 @@ function createScheduleService({ configRepo, logger }) {
     /**
      * Enable or disable automatic recaps
      */
-    setEnabled(enabled) {
-      configRepo.update({ enabled: enabled ? 1 : 0 });
+    async setEnabled(enabled) {
+      await configRepo.update({ enabled: enabled ? 1 : 0 });
       logger?.info(enabled ? "Récaps activés" : "Récaps désactivés");
     },
 
@@ -144,14 +144,14 @@ function createScheduleService({ configRepo, logger }) {
      * Start or restart the scheduler
      * @param {Function} onTick - Callback to execute on schedule
      */
-    start(onTick) {
+    async start(onTick) {
       // Stop existing task if any
       if (scheduledTask) {
         scheduledTask.stop();
         scheduledTask = null;
       }
 
-      const config = configRepo.get();
+      const config = await configRepo.get();
 
       if (!config || !config.enabled) {
         logger?.info("Scheduler non démarré (désactivé)");
@@ -201,8 +201,8 @@ function createScheduleService({ configRepo, logger }) {
      * Check if recap can be sent
      * @throws {ConfigError} If channel not configured
      */
-    validateCanSendRecap() {
-      const config = configRepo.get();
+    async validateCanSendRecap() {
+      const config = await configRepo.get();
       if (!config?.channel_id) {
         throw new ConfigError(
           "Channel not configured",
@@ -216,8 +216,8 @@ function createScheduleService({ configRepo, logger }) {
      * Check if today is an active day for recaps
      * @returns {boolean}
      */
-    isTodayActive() {
-      const config = configRepo.get();
+    async isTodayActive() {
+      const config = await configRepo.get();
       const daysOfWeek = config?.days_of_week || ALL_DAYS;
       const timezone = config?.timezone || "Europe/Paris";
       return isTodayActive(daysOfWeek, timezone);

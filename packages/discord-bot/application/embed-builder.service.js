@@ -182,9 +182,9 @@ function createEmbedBuilderService({ userService, logger }) {
   /**
    * TOP3: Podium + best comment + stats (default)
    */
-  function buildTopNEmbed(data, config, n = 3) {
+  async function buildTopNEmbed(data, config, n = 3) {
     const embed = createBaseEmbed(data, config);
-    const linkMap = userService.getAllLinksMap();
+    const linkMap = await userService.getAllLinksMap();
 
     if (data.participantCount === 0) {
       embed.setDescription("😴 **Aucune participation aujourd'hui...**\nRevenez demain !");
@@ -236,9 +236,9 @@ function createEmbedBuilderService({ userService, logger }) {
   /**
    * FULL: All participants with notes and comments
    */
-  function buildFullEmbed(data, config) {
+  async function buildFullEmbed(data, config) {
     const embed = createBaseEmbed(data, config);
-    const linkMap = userService.getAllLinksMap();
+    const linkMap = await userService.getAllLinksMap();
 
     if (data.participantCount === 0) {
       embed.setDescription("😴 **Aucune participation aujourd'hui...**\nRevenez demain !");
@@ -420,9 +420,9 @@ function createEmbedBuilderService({ userService, logger }) {
   /**
    * HIGHLIGHTS: Extremes only
    */
-  function buildHighlightsEmbed(data, config) {
+  async function buildHighlightsEmbed(data, config) {
     const embed = createBaseEmbed(data, config);
-    const linkMap = userService.getAllLinksMap();
+    const linkMap = await userService.getAllLinksMap();
 
     if (data.participantCount === 0) {
       embed.setDescription("😴 **Aucune participation aujourd'hui...**\nRevenez demain !");
@@ -479,9 +479,9 @@ function createEmbedBuilderService({ userService, logger }) {
   /**
    * COMPACT: Inline list
    */
-  function buildCompactEmbed(data, config) {
+  async function buildCompactEmbed(data, config) {
     const embed = createBaseEmbed(data, config);
-    const linkMap = userService.getAllLinksMap();
+    const linkMap = await userService.getAllLinksMap();
 
     if (data.participantCount === 0) {
       embed.setDescription("😴 Aucune participation aujourd'hui...");
@@ -523,8 +523,8 @@ function createEmbedBuilderService({ userService, logger }) {
 
   const builders = {
     [DISPLAY_MODES.MINIMAL]: buildMinimalEmbed,
-    [DISPLAY_MODES.TOP3]: (data, config) => buildTopNEmbed(data, config, 3),
-    [DISPLAY_MODES.TOP5]: (data, config) => buildTopNEmbed(data, config, 5),
+    [DISPLAY_MODES.TOP3]: async (data, config) => buildTopNEmbed(data, config, 3),
+    [DISPLAY_MODES.TOP5]: async (data, config) => buildTopNEmbed(data, config, 5),
     [DISPLAY_MODES.FULL]: buildFullEmbed,
     [DISPLAY_MODES.ANONYMOUS]: buildAnonymousEmbed,
     [DISPLAY_MODES.STATS]: buildStatsEmbed,
@@ -537,9 +537,9 @@ function createEmbedBuilderService({ userService, logger }) {
      * Build embed based on config mode
      * @param {Object} data - Recap data from API
      * @param {Object} config - Bot configuration
-     * @returns {EmbedBuilder}
+     * @returns {Promise<EmbedBuilder>}
      */
-    build(data, config) {
+    async build(data, config) {
       const mode = config.display_mode || DISPLAY_MODES.TOP3;
       const builder = builders[mode] || builders[DISPLAY_MODES.TOP3];
       return builder(data, config);
@@ -550,9 +550,9 @@ function createEmbedBuilderService({ userService, logger }) {
      * @param {Object} data - Recap data
      * @param {Object} config - Bot configuration
      * @param {string} mode - Display mode
-     * @returns {EmbedBuilder}
+     * @returns {Promise<EmbedBuilder>}
      */
-    buildWithMode(data, config, mode) {
+    async buildWithMode(data, config, mode) {
       const builder = builders[mode] || builders[DISPLAY_MODES.TOP3];
       return builder(data, config);
     },
@@ -561,9 +561,9 @@ function createEmbedBuilderService({ userService, logger }) {
      * Build weekly recap embed
      * @param {Object} data - Weekly recap data
      * @param {Object} config - Bot configuration
-     * @returns {EmbedBuilder}
+     * @returns {Promise<EmbedBuilder>}
      */
-    buildWeekly(data, config) {
+    async buildWeekly(data, config) {
       const startDate = formatShortDateFR(data.startDate);
       const endDate = formatShortDateFR(data.endDate);
 
@@ -581,7 +581,7 @@ function createEmbedBuilderService({ userService, logger }) {
         return embed;
       }
 
-      const linkMap = userService.getAllLinksMap();
+      const linkMap = await userService.getAllLinksMap();
 
       // Stats
       embed.addFields(
@@ -633,10 +633,10 @@ function createEmbedBuilderService({ userService, logger }) {
      * Build leaderboard embed
      * @param {Object} data - Leaderboard data
      * @param {Object} config - Bot configuration
-     * @returns {EmbedBuilder}
+     * @returns {Promise<EmbedBuilder>}
      */
-    buildLeaderboard(data, config) {
-      const linkMap = userService.getAllLinksMap();
+    async buildLeaderboard(data, config) {
+      const linkMap = await userService.getAllLinksMap();
 
       const embed = new EmbedBuilder()
         .setColor(0xffd700)

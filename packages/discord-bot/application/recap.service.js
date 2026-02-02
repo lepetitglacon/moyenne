@@ -30,7 +30,7 @@ function createRecapService({
      */
     async send(client) {
       try {
-        const config = scheduleService.validateCanSendRecap();
+        const config = await scheduleService.validateCanSendRecap();
 
         const channel = await client.channels.fetch(config.channel_id);
         if (!channel) {
@@ -51,7 +51,7 @@ function createRecapService({
         }
 
         // Build embed using the embed builder service
-        const embed = embedBuilderService.build(data, config);
+        const embed = await embedBuilderService.build(data, config);
 
         // Build message content (with optional role mention)
         let content = null;
