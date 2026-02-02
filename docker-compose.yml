@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: moyenne-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-moyenne}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moyenne_password}
+      POSTGRES_DB: ${POSTGRES_DB:-moyenne}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-moyenne}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    container_name: moyenne-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: ${SERVER_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-moyenne}:${POSTGRES_PASSWORD:-moyenne_password}@postgres:5432/${POSTGRES_DB:-moyenne}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      DISCORD_BOT_API_KEY: ${DISCORD_BOT_API_KEY:-your_bot_api_key}
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    volumes:
+      - ./packages/server:/app
+      - /app/node_modules
+
+  discord-bot:
+    build:
+      context: .
+      dockerfile: packages/discord-bot/Dockerfile
+    container_name: moyenne-discord-bot
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      NODE_ENV: production
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      API_BASE_URL: ${API_BASE_URL:-http://server:3000}
+      API_KEY: ${DISCORD_BOT_API_KEY:-your_bot_api_key}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-moyenne}:${POSTGRES_PASSWORD:-moyenne_password}@postgres:5432/${POSTGRES_DB:-moyenne}
+    volumes:
+      - ./packages/discord-bot:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+    driver: local

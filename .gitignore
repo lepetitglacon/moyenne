@@ -19,6 +19,10 @@ node_modules/
 *.sqlite3
 *.db
 data/
+# PostgreSQL backups
+*.sql
+*.sql.gz
+backups/
 
 # =============================================================================
 # Build & Output
@@ -98,3 +102,12 @@ coverage/
 .eslintcache
 .stylelintcache
 *.tsbuildinfo
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Docker Compose override files
+docker-compose.override.yml
+docker-compose.override.yaml
+# Docker volumes data
+postgres_data/
