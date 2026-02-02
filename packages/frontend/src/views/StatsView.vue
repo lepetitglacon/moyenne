@@ -380,6 +380,63 @@ function getTagDisplay(tagId: string) {
   return TAG_NAMES[tagId] || { name: tagId, icon: '🏷️' };
 }
 
+// Tag categories for correlation table
+const TAG_CATEGORIES: Record<string, { name: string; icon: string; tags: string[] }> = {
+  work: {
+    name: 'Travail',
+    icon: '💼',
+    tags: ['productive', 'useful_meeting', 'project_progress', 'recognition', 'overload', 'useless_meeting', 'work_conflict', 'deadline'],
+  },
+  social: {
+    name: 'Social',
+    icon: '👥',
+    tags: ['good_exchanges', 'party', 'family_time', 'new_contacts', 'social_conflict', 'loneliness', 'misunderstanding'],
+  },
+  health: {
+    name: 'Sante',
+    icon: '❤️',
+    tags: ['sport', 'good_sleep', 'energy', 'sick', 'tired', 'bad_sleep', 'pain'],
+  },
+  personal: {
+    name: 'Personnel',
+    icon: '🧠',
+    tags: ['hobby', 'accomplishment', 'relaxation', 'good_news', 'procrastination', 'anxiety', 'bad_news'],
+  },
+  external: {
+    name: 'Externe',
+    icon: '🌍',
+    tags: ['good_weather', 'weekend', 'bad_weather', 'transport_issues', 'unexpected'],
+  },
+};
+
+// Compute category correlations from tag stats
+const categoryCorrelations = computed(() => {
+  if (!tagStats.value?.correlations?.length) return [];
+
+  const correlationsMap = new Map(tagStats.value.correlations.map(c => [c.tag, c]));
+
+  return Object.entries(TAG_CATEGORIES).map(([categoryId, category]) => {
+    const categoryTags = category.tags
+      .map(tag => correlationsMap.get(tag))
+      .filter(Boolean) as TagCorrelation[];
+
+    if (categoryTags.length === 0) {
+      return { categoryId, ...category, avgImpact: null, count: 0 };
+    }
+
+    const totalImpact = categoryTags.reduce((sum, t) => sum + t.impact * t.count, 0);
+    const totalCount = categoryTags.reduce((sum, t) => sum + t.count, 0);
+    const avgImpact = totalCount > 0 ? totalImpact / totalCount : 0;
+
+    return {
+      categoryId,
+      ...category,
+      avgImpact: Math.round(avgImpact * 10) / 10,
+      count: totalCount,
+    };
+  }).filter(c => c.count > 0);
+});
+
 // Heatmap
 const heatmapData = computed(() => {
   const map = new Map<string, number>();
@@ -686,46 +743,76 @@ function getBadgeName(key: string): string {
           </div>
 
           <!-- Tag Analysis Section -->
-          <div class="tags-section" v-if="tagStats && (tagStats.topPositive?.length || tagStats.topNegative?.length)">
+          <div class="tags-section">
             <div class="section-title">📊 Analyse des facteurs</div>
 
-            <div class="tags-grid">
-              <!-- Positive impacts -->
-              <div class="tags-column" v-if="tagStats.topPositive?.length">
-                <div class="tags-column-title positive">👍 Impact positif</div>
-                <div class="tag-impact-list">
-                  <div v-for="t in tagStats.topPositive" :key="t.tag" class="tag-impact-item positive">
-                    <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
-                    <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
-                    <span class="tag-impact-value">+{{ t.impact.toFixed(1) }}</span>
+            <template v-if="tagStats && (tagStats.topPositive?.length || tagStats.topNegative?.length || categoryCorrelations.length)">
+              <div class="tags-grid">
+                <!-- Positive impacts -->
+                <div class="tags-column" v-if="tagStats.topPositive?.length">
+                  <div class="tags-column-title positive">👍 Impact positif</div>
+                  <div class="tag-impact-list">
+                    <div v-for="t in tagStats.topPositive" :key="t.tag" class="tag-impact-item positive">
+                      <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
+                      <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
+                      <span class="tag-impact-value">+{{ t.impact.toFixed(1) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Negative impacts -->
+                <div class="tags-column" v-if="tagStats.topNegative?.length">
+                  <div class="tags-column-title negative">👎 Impact negatif</div>
+                  <div class="tag-impact-list">
+                    <div v-for="t in tagStats.topNegative" :key="t.tag" class="tag-impact-item negative">
+                      <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
+                      <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
+                      <span class="tag-impact-value">{{ t.impact.toFixed(1) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Negative impacts -->
-              <div class="tags-column" v-if="tagStats.topNegative?.length">
-                <div class="tags-column-title negative">👎 Impact negatif</div>
-                <div class="tag-impact-list">
-                  <div v-for="t in tagStats.topNegative" :key="t.tag" class="tag-impact-item negative">
-                    <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
-                    <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
-                    <span class="tag-impact-value">{{ t.impact.toFixed(1) }}</span>
+              <!-- Most used tags -->
+              <div class="tags-distribution" v-if="tagStats.distribution?.length">
+                <div class="distribution-title">Tags les plus utilises</div>
+                <div class="distribution-bars">
+                  <div v-for="t in tagStats.distribution.slice(0, 8)" :key="t.tag" class="distribution-item">
+                    <div class="distribution-bar-container">
+                      <div class="distribution-bar" :style="{ width: `${Math.min(t.percent * 3, 100)}%` }"></div>
+                    </div>
+                    <span class="distribution-label">{{ getTagDisplay(t.tag).icon }} {{ t.count }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Category correlation table -->
+            <div class="category-correlation" v-if="categoryCorrelations.length">
+              <div class="distribution-title">Impact par categorie</div>
+              <div class="category-table">
+                <div v-for="cat in categoryCorrelations" :key="cat.categoryId" class="category-row">
+                  <div class="category-info">
+                    <span class="category-icon">{{ cat.icon }}</span>
+                    <span class="category-name">{{ cat.name }}</span>
+                  </div>
+                  <div class="category-bar-container">
+                    <div
+                      class="category-bar"
+                      :class="{ positive: (cat.avgImpact ?? 0) > 0, negative: (cat.avgImpact ?? 0) < 0 }"
+                      :style="{ width: `${Math.min(Math.abs(cat.avgImpact ?? 0) * 10, 100)}%` }"
+                    ></div>
+                  </div>
+                  <div class="category-impact" :class="{ positive: (cat.avgImpact ?? 0) > 0, negative: (cat.avgImpact ?? 0) < 0 }">
+                    {{ (cat.avgImpact ?? 0) > 0 ? '+' : '' }}{{ cat.avgImpact ?? 0 }}
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Most used tags -->
-            <div class="tags-distribution" v-if="tagStats.distribution?.length">
-              <div class="distribution-title">Tags les plus utilises</div>
-              <div class="distribution-bars">
-                <div v-for="t in tagStats.distribution.slice(0, 8)" :key="t.tag" class="distribution-item">
-                  <div class="distribution-bar-container">
-                    <div class="distribution-bar" :style="{ width: `${Math.min(t.percent * 3, 100)}%` }"></div>
-                  </div>
-                  <span class="distribution-label">{{ getTagDisplay(t.tag).icon }} {{ t.count }}</span>
-                </div>
-              </div>
+            <div v-else class="tags-empty">
+              <span>Pas assez de donnees pour afficher les correlations.</span>
+              <span class="tags-hint">Utilisez des tags sur vos notes pour debloquer cette section !</span>
             </div>
           </div>
 
@@ -809,9 +896,9 @@ function getBadgeName(key: string): string {
           </div>
 
           <!-- Daily Leaderboard -->
-          <div class="lb-section daily-section" v-if="dailyLeaderboard.length">
+          <div class="lb-section daily-section">
             <div class="lb-title">📊 Classement du jour</div>
-            <div class="lb-list">
+            <div class="lb-list" v-if="dailyLeaderboard.length">
               <div v-for="entry in dailyLeaderboard.slice(0, 5)" :key="entry.userId" class="lb-row">
                 <div class="rank" :class="getMedalClass(entry.rank - 1)">{{ entry.rank }}</div>
                 <div class="lb-user">{{ entry.username }}</div>
@@ -821,18 +908,23 @@ function getBadgeName(key: string): string {
                 <div class="lb-score">{{ entry.rating }}/20</div>
               </div>
             </div>
+            <div v-else class="lb-empty">Aucune entree pour aujourd'hui</div>
           </div>
 
           <!-- Detective Leaderboard -->
-          <div class="lb-section detective-section" v-if="detectiveLeaderboard.length">
+          <div class="lb-section detective-section">
             <div class="lb-title">🕵️ Top Detectives</div>
-            <div class="lb-list">
+            <div class="lb-list" v-if="detectiveLeaderboard.length">
               <div v-for="(entry, index) in detectiveLeaderboard.slice(0, 5)" :key="entry.userId" class="lb-row">
                 <div class="rank" :class="getMedalClass(index)">{{ index + 1 }}</div>
                 <div class="lb-user">{{ entry.username }}</div>
                 <div class="lb-score">{{ entry.accuracy }}%</div>
                 <div class="lb-sub">({{ entry.correctGuesses }}/{{ entry.totalGuesses }})</div>
               </div>
+            </div>
+            <div v-else class="lb-empty">
+              <span>Pas encore de detectives</span>
+              <span class="lb-hint">Devinez qui a ecrit les commentaires pour apparaitre ici !</span>
             </div>
           </div>
         </div>
@@ -1160,7 +1252,20 @@ function getBadgeName(key: string): string {
 
 .lb-user { flex: 1; font-weight: 700; font-size: 12px; }
 .lb-score { font-weight: 800; font-size: 12px; opacity: .9; }
-.lb-empty { text-align: center; opacity: .5; font-size: 12px; padding: 10px; }
+.lb-empty {
+  text-align: center;
+  opacity: .5;
+  font-size: 12px;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lb-hint, .tags-hint {
+  font-size: 10px;
+  opacity: .7;
+  font-style: italic;
+}
 
 /* Streak card */
 .card--streak .card-value { color: #ff9500; }
@@ -1381,6 +1486,16 @@ function getBadgeName(key: string): string {
 .tag-impact-item.positive .tag-impact-value { color: #4ade80; }
 .tag-impact-item.negative .tag-impact-value { color: #f87171; }
 
+.tags-empty {
+  text-align: center;
+  opacity: .5;
+  font-size: 12px;
+  padding: 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .tags-distribution { margin-top: 12px; }
 
 .distribution-title {
@@ -1422,6 +1537,66 @@ function getBadgeName(key: string): string {
   opacity: .7;
   min-width: 40px;
 }
+
+/* Category correlation table */
+.category-correlation {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.category-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.03);
+  border-radius: 6px;
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 100px;
+}
+
+.category-icon { font-size: 14px; }
+.category-name { font-size: 12px; font-weight: 600; }
+
+.category-bar-container {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.category-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.category-bar.positive { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.category-bar.negative { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+.category-impact {
+  min-width: 40px;
+  text-align: right;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.category-impact.positive { color: #4ade80; }
+.category-impact.negative { color: #f87171; }
 
 /* Daily & Detective sections */
 .daily-section, .detective-section {
