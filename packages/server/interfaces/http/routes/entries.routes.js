@@ -35,7 +35,7 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
     }
   });
 
-  // Get next review (anonymous - no username returned)
+  // Get next review (anonymous - no username or rating returned for guessing game)
   router.get("/review/next", authenticateToken, async (req, res, next) => {
     try {
       const result = await entryService.getNextReview({ userId: req.user.id });
@@ -44,29 +44,31 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
         return res.json({ done: true });
       }
 
-      // Return entry WITHOUT username for anonymity (guessing game)
+      // Return entry WITHOUT username and WITHOUT rating for guessing game
+      // Tags are shown to help guess the author
       res.json({
         userId: result.userId,
         date: result.date,
-        rating: result.rating,
         description: result.description,
-        // NOTE: username intentionally NOT included - it's a guessing game!
+        tags: result.tags || [],
+        // NOTE: username and rating intentionally NOT included - it's a guessing game!
       });
     } catch (err) {
       next(err);
     }
   });
 
-  // Add rating (with optional guess)
+  // Add rating (with optional guess for author and rating)
   router.post("/ratings", authenticateToken, async (req, res, next) => {
     try {
-      const { toUserId, date, rating, guessedUserId } = req.body;
+      const { toUserId, date, rating, guessedUserId, guessedRating } = req.body;
       const result = await entryService.saveRating({
         fromUserId: req.user.id,
         toUserId,
         date,
         rating,
         guessedUserId: guessedUserId || null,
+        guessedRating: guessedRating !== undefined ? guessedRating : null,
       });
 
       res.json({

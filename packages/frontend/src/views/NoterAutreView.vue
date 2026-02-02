@@ -3,12 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import { useAuth } from "../composables/useAuth";
-import { useFlow } from "../composables/useFlow";
 
 const router = useRouter();
 const { authFetch } = useAuth();
-
-const { otherScore } = useFlow();
 
 const loading = ref(true);
 const saving = ref(false);
@@ -18,12 +15,13 @@ const showResult = ref(false);
 // Liste des utilisateurs pour le dropdown
 const users = ref<{ id: number; username: string }[]>([]);
 const selectedUserId = ref<number | null>(null);
+const guessedRating = ref<number>(10);
 
 const target = ref<null | {
   userId: number;
   date: string;
-  rating: number;
   description: string | null;
+  tags: string[];
 }>(null);
 
 // Guess result
@@ -32,38 +30,55 @@ const guessResult = ref<null | {
   streak: number;
   stats: { totalGuesses: number; correctGuesses: number; accuracy: number };
   actualUserId: number;
+  actualRating: number;
+  guessedRating: number | null;
+  ratingGuessCorrect: boolean;
+  ratingGuessExact: boolean;
 }>(null);
 
 const newBadges = ref<string[]>([]);
 
-const otherMoodLabels = [
-  "TES ANCETRES ONT HONTE",
-  "MEME LE KARMA A EU PITIE DE TOI",
-  "C'EST UNE JOURNEE A DECLARER A L'ASSURANCE",
-  "DEGATS IRREVERSIBLES",
-  "J'AI MAL POUR TOI",
-  "CA SENT LE BURNOUT",
-  "DECEVANT, MAIS COHERENT AVEC TON PARCOURS",
-  "PAS MORT MAIS PAS GLORIEUX",
-  "C'EST LEGAL MAIS IMMORAL",
-  "JE VOIS CE QUE TU VEUX DIRE",
-  "TU ES A DEUX DOIGTS DE DEVENIR QUELQU'UN",
-  "CA VA... SI ON BAISSE LES ATTENTES",
-  "OK, MAIS NE RECOMMENCE PAS",
-  "CA S'AMELIORE, ETRANGEMENT",
-  "PAS MAL DU TOUT, JE SUIS SURPRIS",
-  "TU AS EU UNE VRAIE JOURNEE, TOI",
-  "SUSPECTEMENT BIEN",
-  "QUI T'A LAISSE ETRE HEUREUX ?",
-  "C'EST ECOEURANT DE REUSSIR AUTANT",
-  "C'EST CARREMENT INDECENT",
-  "JE TE DETESTE CORDIALEMENT (MAIS BRAVO)",
-] as const;
+// Tag definitions for display
+const TAG_NAMES: Record<string, { name: string; icon: string }> = {
+  productive: { name: 'Productif', icon: '✅' },
+  useful_meeting: { name: 'Reunion utile', icon: '🤝' },
+  project_progress: { name: 'Projet avance', icon: '📈' },
+  recognition: { name: 'Reconnaissance', icon: '🏆' },
+  overload: { name: 'Surcharge', icon: '😫' },
+  useless_meeting: { name: 'Reunion inutile', icon: '🙄' },
+  work_conflict: { name: 'Conflit', icon: '⚡' },
+  deadline: { name: 'Deadline', icon: '⏰' },
+  good_exchanges: { name: 'Bons echanges', icon: '💬' },
+  party: { name: 'Soiree', icon: '🎉' },
+  family_time: { name: 'Famille', icon: '👨‍👩‍👧' },
+  new_contacts: { name: 'Nouveaux contacts', icon: '🤗' },
+  social_conflict: { name: 'Conflit social', icon: '😤' },
+  loneliness: { name: 'Solitude', icon: '😔' },
+  misunderstanding: { name: 'Malentendu', icon: '😕' },
+  sport: { name: 'Sport', icon: '🏃' },
+  good_sleep: { name: 'Bien dormi', icon: '😴' },
+  energy: { name: 'Energie', icon: '⚡' },
+  sick: { name: 'Malade', icon: '🤒' },
+  tired: { name: 'Fatigue', icon: '😩' },
+  bad_sleep: { name: 'Mal dormi', icon: '😵' },
+  pain: { name: 'Douleurs', icon: '🤕' },
+  hobby: { name: 'Hobby', icon: '🎨' },
+  accomplishment: { name: 'Accomplissement', icon: '🎯' },
+  relaxation: { name: 'Detente', icon: '🧘' },
+  good_news: { name: 'Bonne nouvelle', icon: '📰' },
+  procrastination: { name: 'Procrastination', icon: '📱' },
+  anxiety: { name: 'Anxiete', icon: '😰' },
+  bad_news: { name: 'Mauvaise nouvelle', icon: '😢' },
+  good_weather: { name: 'Beau temps', icon: '☀️' },
+  weekend: { name: 'Week-end', icon: '🎊' },
+  bad_weather: { name: 'Mauvais temps', icon: '🌧️' },
+  transport_issues: { name: 'Transports', icon: '🚇' },
+  unexpected: { name: 'Imprevu', icon: '😱' },
+};
 
-const myRatingText = computed(() => {
-  const score = otherScore.value;
-  return `${otherMoodLabels[score]} ${score} / 20`;
-});
+function getTagDisplay(tagId: string) {
+  return TAG_NAMES[tagId] || { name: tagId, icon: '🏷️' };
+}
 
 // Texte du commentaire (ou placeholder si vide)
 const commentText = computed(() => {
@@ -71,11 +86,6 @@ const commentText = computed(() => {
     return "Aucun commentaire pour cette journee.";
   }
   return target.value.description;
-});
-
-// Note de la personne
-const theirRating = computed(() => {
-  return target.value?.rating ?? 0;
 });
 
 onMounted(async () => {
@@ -111,8 +121,8 @@ onMounted(async () => {
     target.value = {
       userId: data.userId,
       date: data.date,
-      rating: data.rating,
       description: data.description,
+      tags: data.tags || [],
     };
   } catch (e: any) {
     error.value = e?.message ?? "Erreur reseau.";
@@ -138,14 +148,15 @@ async function next() {
       body: JSON.stringify({
         toUserId: target.value.userId,
         date: target.value.date,
-        rating: otherScore.value,
+        rating: guessedRating.value,
         guessedUserId: selectedUserId.value,
+        guessedRating: guessedRating.value,
       }),
     });
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data?.message || "Erreur lors de l'enregistrement de ta note.");
+      throw new Error(data?.message || "Erreur lors de l'enregistrement.");
     }
 
     const data = await res.json();
@@ -158,12 +169,8 @@ async function next() {
       newBadges.value = data.newBadges;
     }
 
-    // Show result screen if there was a guess
-    if (selectedUserId.value && data.guessResult) {
-      showResult.value = true;
-    } else {
-      router.push({ name: "merci" });
-    }
+    // Always show result screen now
+    showResult.value = true;
   } catch (e: any) {
     error.value = e?.message ?? "Erreur reseau.";
   } finally {
@@ -206,33 +213,55 @@ function reload() {
       <!-- Result screen after guess -->
       <template v-else-if="showResult && guessResult">
         <div class="result-container">
-          <!-- Correct guess -->
-          <template v-if="guessResult.isCorrect">
-            <div class="result-icon correct">🎉</div>
-            <div class="result-title correct">Bonne reponse !</div>
-            <div class="result-text">
-              C'etait bien <strong>{{ getUsernameById(guessResult.actualUserId) }}</strong>
-            </div>
-          </template>
+          <div class="result-header">🕵️ Resultats</div>
 
-          <!-- Wrong guess -->
-          <template v-else>
-            <div class="result-icon wrong">😅</div>
-            <div class="result-title wrong">Rate !</div>
-            <div class="result-text">
+          <!-- Author guess result -->
+          <div class="result-card" :class="{ correct: guessResult.isCorrect, wrong: !guessResult.isCorrect }">
+            <div class="result-card-title">Qui a ecrit ?</div>
+            <div class="result-card-icon">{{ guessResult.isCorrect ? '✅' : '❌' }}</div>
+            <div class="result-card-text">
               C'etait <strong>{{ getUsernameById(guessResult.actualUserId) }}</strong>
             </div>
-          </template>
+          </div>
+
+          <!-- Rating guess result -->
+          <div class="result-card" :class="{ correct: guessResult.ratingGuessCorrect, wrong: !guessResult.ratingGuessCorrect }">
+            <div class="result-card-title">Quelle note ?</div>
+            <div class="result-card-icon">{{ guessResult.ratingGuessExact ? '🎯' : guessResult.ratingGuessCorrect ? '✅' : '❌' }}</div>
+            <div class="result-card-text">
+              <span v-if="guessResult.ratingGuessExact">Exact ! </span>
+              <span v-else-if="guessResult.ratingGuessCorrect">Presque ! </span>
+              <span v-else>Rate ! </span>
+              Note reelle : <strong>{{ guessResult.actualRating }}/20</strong>
+              <span class="guess-detail">(tu as dit {{ guessResult.guessedRating }})</span>
+            </div>
+          </div>
+
+          <!-- Score summary -->
+          <div class="score-summary">
+            <div class="score-item" v-if="guessResult.isCorrect && guessResult.ratingGuessExact">
+              <span class="score-icon">🏆</span>
+              <span>Double parfait !</span>
+            </div>
+            <div class="score-item" v-else-if="guessResult.isCorrect && guessResult.ratingGuessCorrect">
+              <span class="score-icon">⭐</span>
+              <span>Tres bon !</span>
+            </div>
+            <div class="score-item" v-else-if="guessResult.isCorrect || guessResult.ratingGuessCorrect">
+              <span class="score-icon">👍</span>
+              <span>Pas mal !</span>
+            </div>
+          </div>
 
           <!-- Streak -->
-          <div class="streak-badge" v-if="guessResult.isCorrect && guessResult.streak > 0">
+          <div class="streak-badge" v-if="guessResult.isCorrect && guessResult.streak > 1">
             <span class="streak-icon">🔥</span>
-            Serie actuelle: <strong>{{ guessResult.streak }}</strong>
+            Serie : <strong>{{ guessResult.streak }}</strong> bonnes reponses
           </div>
 
           <!-- Stats -->
           <div class="guess-stats">
-            <span class="stat-label">Precision:</span>
+            <span class="stat-label">Precision auteur :</span>
             <span class="stat-value">{{ guessResult.stats.accuracy }}%</span>
             <span class="stat-detail">({{ guessResult.stats.correctGuesses }}/{{ guessResult.stats.totalGuesses }})</span>
           </div>
@@ -257,42 +286,47 @@ function reload() {
       </template>
 
       <template v-else-if="target">
-        <!-- Section commentaire anonyme -->
-        <div class="step-subtitle">Voici le commentaire d'hier</div>
+        <div class="game-title">🕵️ Devine qui a ecrit...</div>
 
-        <div class="textarea readonly" :class="{ 'textarea--empty': !target.description }">
-          {{ commentText }}
+        <!-- Commentaire anonyme -->
+        <div class="comment-card">
+          <div class="comment-text" :class="{ 'comment-text--empty': !target.description }">
+            {{ commentText }}
+          </div>
+
+          <!-- Tags -->
+          <div class="comment-tags" v-if="target.tags?.length">
+            <span v-for="tag in target.tags" :key="tag" class="tag-chip">
+              {{ getTagDisplay(tag).icon }} {{ getTagDisplay(tag).name }}
+            </span>
+          </div>
         </div>
 
-        <!-- Note de la personne -->
-        <div class="rating-badge">
-          Note donnee : <strong>{{ theirRating }} / 20</strong>
-        </div>
+        <!-- Section devinettes -->
+        <div class="guess-grid">
+          <!-- Deviner l'auteur -->
+          <div class="guess-card">
+            <label class="guess-label" for="guess-select">👤 Qui a ecrit ca ?</label>
+            <select id="guess-select" class="select-input" v-model="selectedUserId">
+              <option :value="null">Je ne sais pas</option>
+              <option v-for="user in users" :key="user.id" :value="user.id">
+                {{ user.username }}
+              </option>
+            </select>
+          </div>
 
-        <!-- Deviner l'auteur -->
-        <div class="guess-section">
-          <label class="step-subtitle" for="guess-select">A ton avis, qui a ecrit ca ?</label>
-          <select id="guess-select" class="select-input" v-model="selectedUserId">
-            <option :value="null">Je ne sais pas</option>
-            <option v-for="user in users" :key="user.id" :value="user.id">
-              {{ user.username }}
-            </option>
-          </select>
+          <!-- Deviner la note -->
+          <div class="guess-card">
+            <label class="guess-label">🎯 Quelle note a-t-il mis ?</label>
+            <div class="rating-guess">
+              <span class="rating-value">{{ guessedRating }}/20</span>
+              <input class="range" type="range" min="0" max="20" v-model.number="guessedRating" />
+            </div>
+          </div>
         </div>
-
-        <!-- Section notation -->
-        <div class="step-subtitle" style="margin-top: 24px;">
-          Quelle note donnes-tu a cette journee ?
-        </div>
-
-        <div class="step-value" :class="{ 'step-value--glow': otherScore > 15 }">
-          {{ myRatingText }}
-        </div>
-
-        <input class="range" type="range" min="0" max="20" v-model.number="otherScore" />
 
         <button class="btn btn-primary btn-wide" type="button" @click="next" :disabled="saving">
-          {{ saving ? "SAUVEGARDE..." : "VALIDER" }}
+          {{ saving ? "VERIFICATION..." : "VALIDER MES REPONSES" }}
         </button>
 
         <p v-if="error" class="form-error">{{ error }}</p>
@@ -302,27 +336,75 @@ function reload() {
 </template>
 
 <style scoped>
-.textarea--empty {
-  font-style: italic;
-  opacity: 0.7;
+.game-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 16px;
+  text-align: center;
 }
 
-.rating-badge {
-  margin-top: 12px;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 0.95rem;
-}
-
-.guess-section {
-  margin-top: 24px;
+.comment-card {
   width: 100%;
-  max-width: 320px;
+  max-width: 400px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  margin-bottom: 24px;
 }
 
-.guess-section .step-subtitle {
-  margin-bottom: 8px;
+.comment-text {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  text-align: center;
+  font-style: italic;
+}
+
+.comment-text--empty {
+  opacity: 0.5;
+}
+
+.comment-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.guess-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 24px;
+}
+
+.guess-card {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.guess-label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
 .select-input {
@@ -348,6 +430,23 @@ function reload() {
   color: #fff;
 }
 
+.rating-guess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.rating-value {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #fbbf24;
+}
+
+.range {
+  width: 100%;
+}
+
 /* Result screen styles */
 .result-container {
   display: flex;
@@ -356,6 +455,14 @@ function reload() {
   gap: 16px;
   text-align: center;
   animation: fadeIn 0.3s ease;
+  width: 100%;
+  max-width: 400px;
+}
+
+.result-header {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 8px;
 }
 
 @keyframes fadeIn {
@@ -363,28 +470,63 @@ function reload() {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.result-icon {
-  font-size: 4rem;
-  animation: bounce 0.5s ease;
+.result-card {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-@keyframes bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
+.result-card.correct {
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
-.result-title {
-  font-size: 1.5rem;
-  font-weight: 800;
+.result-card.wrong {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.result-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
   text-transform: uppercase;
+  opacity: 0.7;
 }
 
-.result-title.correct { color: #4ade80; }
-.result-title.wrong { color: #f87171; }
+.result-card-icon {
+  font-size: 2rem;
+}
 
-.result-text {
+.result-card-text {
   font-size: 1rem;
-  opacity: 0.9;
+}
+
+.guess-detail {
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.score-summary {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.1));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.score-icon {
+  font-size: 1.5rem;
 }
 
 .streak-badge {

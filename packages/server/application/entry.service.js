@@ -153,9 +153,11 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
         done: false,
         userId: assignment.reviewee_id,
         date: yesterday,
-        rating: parseInt(entry.rating, 10) || 0,
         description: entry.description,
-        // NOTE: No username returned - it's anonymous!
+        tags: entry.tags || [],
+        // NOTE: No username or rating returned - it's a double guessing game!
+        // The actual rating is stored for validation but not sent to client
+        _actualRating: parseInt(entry.rating, 10) || 0,
       };
     },
 
@@ -165,10 +167,10 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
      * - Only for yesterday's entries
      * - Can only rate once per day
      *
-     * @param {{ fromUserId: number, toUserId: number, date: string, rating: number, guessedUserId?: number }} params
-     * @returns {Promise<{ newBadges: string[], guessResult?: { isCorrect: boolean, streak: number, stats: Object } }>}
+     * @param {{ fromUserId: number, toUserId: number, date: string, rating: number, guessedUserId?: number, guessedRating?: number }} params
+     * @returns {Promise<{ newBadges: string[], guessResult?: { isCorrect: boolean, streak: number, stats: Object, actualRating: number, ratingGuessCorrect: boolean } }>}
      */
-    async saveRating({ fromUserId, toUserId, date, rating, guessedUserId }) {
+    async saveRating({ fromUserId, toUserId, date, rating, guessedUserId, guessedRating }) {
       const yesterday = getYesterday();
 
       // Validate date
@@ -206,29 +208,56 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
         }
       }
 
-      // Handle guess if provided
+      // Get the actual entry to check rating guess
+      const actualEntry = await entryRepo.findByUserAndDate(toUserId, date);
+      const actualRating = actualEntry ? parseInt(actualEntry.rating, 10) || 0 : 0;
+
+      // Handle guesses (author and/or rating)
       let guessResult = null;
-      if (guessedUserId && guessRepo) {
-        const { isCorrect, streak } = await guessRepo.save(fromUserId, toUserId, guessedUserId, date);
-        const stats = await guessRepo.getStats(fromUserId);
+      const hasAuthorGuess = guessedUserId !== null && guessedUserId !== undefined;
+      const hasRatingGuess = guessedRating !== null && guessedRating !== undefined;
+
+      if (hasAuthorGuess || hasRatingGuess) {
+        // Check author guess
+        let authorCorrect = false;
+        let streak = 0;
+        let stats = { totalGuesses: 0, correctGuesses: 0, accuracy: 0 };
+
+        if (hasAuthorGuess && guessRepo) {
+          const guessData = await guessRepo.save(fromUserId, toUserId, guessedUserId, date);
+          authorCorrect = guessData.isCorrect;
+          streak = guessData.streak;
+          stats = await guessRepo.getStats(fromUserId);
+        }
+
+        // Check rating guess (exact match or within 1 point)
+        const ratingGuessCorrect = hasRatingGuess && Math.abs(guessedRating - actualRating) <= 1;
+        const ratingGuessExact = hasRatingGuess && guessedRating === actualRating;
 
         guessResult = {
-          isCorrect,
+          isCorrect: authorCorrect,
           streak,
           stats,
           actualUserId: toUserId,
+          actualRating,
+          guessedRating: hasRatingGuess ? guessedRating : null,
+          ratingGuessCorrect,
+          ratingGuessExact,
         };
 
         logger?.info("Guess enregistre", {
           fromUserId,
           guessedUserId,
           actualUserId: toUserId,
-          isCorrect,
+          authorCorrect,
+          guessedRating,
+          actualRating,
+          ratingGuessCorrect,
           streak
         });
 
         // Check and award detective badges
-        if (badgeService) {
+        if (badgeService && hasAuthorGuess) {
           const detectiveBadges = await badgeService.checkAllBadgesAfterGuess(fromUserId);
           if (detectiveBadges.length > 0) {
             newBadges.push(...detectiveBadges);
