@@ -118,35 +118,25 @@ const command = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName("reminder")
-      .setDescription("Active ou désactive le rappel avant le récap")
+      .setDescription("Configure le rappel avant le récap")
       .addStringOption((option) =>
         option
           .setName("etat")
           .setDescription("Activer ou désactiver")
-          .setRequired(true)
+          .setRequired(false)
           .addChoices(
             { name: "Activer", value: "on" },
             { name: "Désactiver", value: "off" }
           )
       )
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName("reminder-time")
-      .setDescription("Configure le délai du rappel avant le récap")
       .addIntegerOption((option) =>
         option
           .setName("minutes")
           .setDescription("Minutes avant le récap (5-120)")
-          .setRequired(true)
+          .setRequired(false)
           .setMinValue(5)
           .setMaxValue(120)
       )
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName("reminder-message")
-      .setDescription("Configure le message personnalisé du rappel")
       .addStringOption((option) =>
         option
           .setName("message")
@@ -265,8 +255,6 @@ const ADMIN_SUBCOMMANDS = [
   "days",
   "timezone",
   "reminder",
-  "reminder-time",
-  "reminder-message",
   "mention",
   "min-participants",
   "reset",

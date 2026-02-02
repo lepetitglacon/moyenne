@@ -143,12 +143,6 @@ function createRecapHandler({
           case "reminder":
             await this._handleReminder(interaction, client);
             break;
-          case "reminder-time":
-            await this._handleReminderTime(interaction, client);
-            break;
-          case "reminder-message":
-            await this._handleReminderMessage(interaction);
-            break;
           case "mention":
             await this._handleMention(interaction);
             break;
@@ -351,65 +345,77 @@ function createRecapHandler({
 
     async _handleReminder(interaction, client) {
       const state = interaction.options.getString("etat");
-      const enabled = state === "on";
+      const minutes = interaction.options.getInteger("minutes");
+      const message = interaction.options.getString("message");
 
-      await configRepo.update({ reminder_enabled: enabled ? 1 : 0 });
+      const updates = {};
+      const responses = [];
 
-      if (reminderService) {
+      // Handle state change
+      if (state) {
+        const enabled = state === "on";
+        updates.reminder_enabled = enabled ? 1 : 0;
+
+        if (reminderService) {
+          if (enabled) {
+            await reminderService.start(client);
+          } else {
+            reminderService.stop();
+          }
+        }
+
         if (enabled) {
-          await reminderService.start(client);
+          const config = await configRepo.get();
+          responses.push(`Rappel activé (${config.reminder_minutes || REMINDER_DEFAULTS.minutes} min avant)`);
         } else {
-          reminderService.stop();
+          responses.push("Rappel désactivé");
         }
       }
 
-      if (enabled) {
+      // Handle minutes change
+      if (minutes !== null) {
+        if (minutes < REMINDER_DEFAULTS.minMinutes || minutes > REMINDER_DEFAULTS.maxMinutes) {
+          await replyError(interaction, MESSAGES.INVALID_MINUTES);
+          return;
+        }
+        updates.reminder_minutes = minutes;
+        responses.push(`Délai: ${minutes} minutes`);
+
+        if (reminderService) {
+          await reminderService.start(client);
+        }
+      }
+
+      // Handle message change
+      if (message !== undefined) {
+        updates.reminder_message = message || null;
+        if (message) {
+          responses.push(`Message: "${message}"`);
+        } else {
+          responses.push("Message réinitialisé");
+        }
+      }
+
+      // Apply updates if any
+      if (Object.keys(updates).length > 0) {
+        await configRepo.update(updates);
+      }
+
+      // Send response
+      if (responses.length > 0) {
+        await replySuccess(
+          interaction,
+          formatMessage(MESSAGES.CONFIG_SAVED, { details: responses.join("\n") })
+        );
+      } else {
+        // No options provided, show current status
         const config = await configRepo.get();
+        const status = config.reminder_enabled
+          ? `Activé (${config.reminder_minutes || REMINDER_DEFAULTS.minutes} min avant)`
+          : "Désactivé";
         await replySuccess(
           interaction,
-          formatMessage(MESSAGES.REMINDER_ON, {
-            minutes: config.reminder_minutes || REMINDER_DEFAULTS.minutes,
-          })
-        );
-      } else {
-        await replySuccess(interaction, MESSAGES.REMINDER_OFF);
-      }
-    },
-
-    async _handleReminderTime(interaction, client) {
-      const minutes = interaction.options.getInteger("minutes");
-
-      if (minutes < REMINDER_DEFAULTS.minMinutes || minutes > REMINDER_DEFAULTS.maxMinutes) {
-        await replyError(interaction, MESSAGES.INVALID_MINUTES);
-        return;
-      }
-
-      await configRepo.update({ reminder_minutes: minutes });
-
-      if (reminderService) {
-        await reminderService.start(client);
-      }
-
-      await replySuccess(
-        interaction,
-        formatMessage(MESSAGES.REMINDER_TIME_SET, { minutes })
-      );
-    },
-
-    async _handleReminderMessage(interaction) {
-      const message = interaction.options.getString("message");
-
-      await configRepo.update({ reminder_message: message || null });
-
-      if (message) {
-        await replySuccess(
-          interaction,
-          formatMessage(MESSAGES.CONFIG_SAVED, { details: `Message de rappel : ${message}` })
-        );
-      } else {
-        await replySuccess(
-          interaction,
-          formatMessage(MESSAGES.CONFIG_SAVED, { details: "Message de rappel réinitialisé" })
+          formatMessage(MESSAGES.CONFIG_SAVED, { details: `Rappel: ${status}` })
         );
       }
     },
