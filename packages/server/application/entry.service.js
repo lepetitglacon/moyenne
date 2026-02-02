@@ -39,7 +39,7 @@ import { ValidationError } from "../shared/index.js";
  * Create entry service instance
  * @param {EntryDependencies} deps
  */
-export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, badgeService, logger }) {
+export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, guessRepo, badgeService, logger }) {
   // Helper to normalize date for streak calculation
   function normalizeDate(date) {
     if (!date) return null;
@@ -165,10 +165,10 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, badg
      * - Only for yesterday's entries
      * - Can only rate once per day
      *
-     * @param {{ fromUserId: number, toUserId: number, date: string, rating: number }} params
-     * @returns {Promise<void>}
+     * @param {{ fromUserId: number, toUserId: number, date: string, rating: number, guessedUserId?: number }} params
+     * @returns {Promise<{ newBadges: string[], guessResult?: { isCorrect: boolean, streak: number, stats: Object } }>}
      */
-    async saveRating({ fromUserId, toUserId, date, rating }) {
+    async saveRating({ fromUserId, toUserId, date, rating, guessedUserId }) {
       const yesterday = getYesterday();
 
       // Validate date
@@ -206,7 +206,38 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, badg
         }
       }
 
-      return { newBadges };
+      // Handle guess if provided
+      let guessResult = null;
+      if (guessedUserId && guessRepo) {
+        const { isCorrect, streak } = await guessRepo.save(fromUserId, toUserId, guessedUserId, date);
+        const stats = await guessRepo.getStats(fromUserId);
+
+        guessResult = {
+          isCorrect,
+          streak,
+          stats,
+          actualUserId: toUserId,
+        };
+
+        logger?.info("Guess enregistre", {
+          fromUserId,
+          guessedUserId,
+          actualUserId: toUserId,
+          isCorrect,
+          streak
+        });
+
+        // Check and award detective badges
+        if (badgeService) {
+          const detectiveBadges = await badgeService.checkAllBadgesAfterGuess(fromUserId);
+          if (detectiveBadges.length > 0) {
+            newBadges.push(...detectiveBadges);
+            logger?.info("Nouveaux badges detective attribues", { userId: fromUserId, badges: detectiveBadges });
+          }
+        }
+      }
+
+      return { newBadges, guessResult };
     },
   };
 }

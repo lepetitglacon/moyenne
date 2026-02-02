@@ -185,6 +185,22 @@ async function initDb() {
     `);
     console.log('   ✓ Table user_badges ready');
 
+    // Guesses (detective game)
+    console.log('   → Creating table: guesses');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS guesses (
+        id SERIAL PRIMARY KEY,
+        guesser_id INTEGER NOT NULL REFERENCES users(id),
+        entry_user_id INTEGER NOT NULL REFERENCES users(id),
+        guessed_user_id INTEGER NOT NULL REFERENCES users(id),
+        date DATE NOT NULL,
+        is_correct BOOLEAN NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(guesser_id, date)
+      )
+    `);
+    console.log('   ✓ Table guesses ready');
+
     // ═══════════════════════════════════════════════════════════════
     // MIGRATIONS
     // ═══════════════════════════════════════════════════════════════
@@ -218,6 +234,8 @@ async function initDb() {
       { name: 'idx_events_user_at', table: 'events', column: 'user_id, at' },
       { name: 'idx_user_badges_user', table: 'user_badges', column: 'user_id' },
       { name: 'idx_assignments_date', table: 'review_assignments', column: 'date' },
+      { name: 'idx_guesses_guesser', table: 'guesses', column: 'guesser_id' },
+      { name: 'idx_guesses_date', table: 'guesses', column: 'date' },
     ];
 
     for (const idx of indexes) {

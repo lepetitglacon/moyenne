@@ -9,7 +9,7 @@ const router = useRouter();
 const { authFetch } = useAuth();
 
 // Types
-type MonthEntry = { date: string; rating: number };
+type MonthEntry = { date: string; rating: number; description: string | null; tags: string[] };
 type MonthlyData = { month: string; avgRating: number; entryCount: number };
 type YearEntry = { date: string; rating: number };
 type Distribution = { rating: number; count: number };
@@ -33,8 +33,8 @@ type StatsPayload = {
   today: string;
   monthStart: string;
   monthEnd: string;
-  lastEntry: null | { date: string; rating: number; description: string };
-  todayEntry: null | { date: string; rating: number; description: string };
+  lastEntry: null | { date: string; rating: number; description: string; tags: string[] };
+  todayEntry: null | { date: string; rating: number; description: string; tags: string[] };
   participationCount: number;
   currentMonthAvg: number | null;
   monthEntries: MonthEntry[];
@@ -70,6 +70,44 @@ type LeaderboardPayload = {
 
 type UserLite = { id: number; username: string };
 
+type TagStat = {
+  tag: string;
+  avgRating: number;
+  count: number;
+};
+
+type TagCorrelation = {
+  tag: string;
+  withTag: number;
+  withoutTag: number;
+  impact: number;
+  count: number;
+};
+
+type TagStatsPayload = {
+  byTag: TagStat[];
+  distribution: { tag: string; count: number; percent: number }[];
+  correlations: TagCorrelation[];
+  topPositive: TagCorrelation[];
+  topNegative: TagCorrelation[];
+};
+
+type DetectiveEntry = {
+  userId: number;
+  username: string;
+  totalGuesses: number;
+  correctGuesses: number;
+  accuracy: number;
+};
+
+type DailyEntry = {
+  rank: number;
+  userId: number;
+  username: string;
+  rating: number;
+  tags: string[];
+};
+
 // State
 const activeTab = ref<"personal" | "global">("personal");
 const loading = ref(true);
@@ -83,6 +121,9 @@ const selectedYear = ref(new Date().getFullYear());
 const stats = ref<StatsPayload | null>(null);
 const graphs = ref<GraphPayload | null>(null);
 const leaderboard = ref<LeaderboardPayload | null>(null);
+const tagStats = ref<TagStatsPayload | null>(null);
+const detectiveLeaderboard = ref<DetectiveEntry[]>([]);
+const dailyLeaderboard = ref<DailyEntry[]>([]);
 
 // Loaders
 async function loadUsers() {
@@ -132,8 +173,34 @@ async function loadLeaderboard() {
   } catch {}
 }
 
+async function loadTagStats() {
+  try {
+    const userId = target.value === "me" ? "me" : target.value;
+    const base = userId === "me" ? "/api/me/tags-stats" : `/api/tags-stats`;
+    const res = await authFetch(base);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) tagStats.value = data;
+  } catch {}
+}
+
+async function loadDetectiveLeaderboard() {
+  try {
+    const res = await authFetch("/api/leaderboard/detectives");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) detectiveLeaderboard.value = data.leaderboard || [];
+  } catch {}
+}
+
+async function loadDailyLeaderboard() {
+  try {
+    const res = await authFetch("/api/leaderboard/daily");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) dailyLeaderboard.value = data.entries || [];
+  } catch {}
+}
+
 async function loadAll() {
-  await Promise.all([loadStats(), loadGraphs(), loadLeaderboard()]);
+  await Promise.all([loadStats(), loadGraphs(), loadLeaderboard(), loadTagStats(), loadDetectiveLeaderboard(), loadDailyLeaderboard()]);
 }
 
 onMounted(async () => {
@@ -214,10 +281,26 @@ const firstDayOffset = computed(() => {
   return (start.getDay() + 6) % 7;
 });
 
+// Full entries map with all data
+const entriesMapFull = computed(() => {
+  const map = new Map<string, MonthEntry>();
+  (stats.value?.monthEntries || []).forEach((e) => map.set(e.date, e));
+  // Only add todayEntry if not already in monthEntries (to preserve tags)
+  if (stats.value?.todayEntry && !map.has(stats.value.todayEntry.date)) {
+    map.set(stats.value.todayEntry.date, {
+      date: stats.value.todayEntry.date,
+      rating: stats.value.todayEntry.rating,
+      description: stats.value.todayEntry.description,
+      tags: stats.value.todayEntry.tags || [],
+    });
+  }
+  return map;
+});
+
+// Simple map for quick rating lookup
 const entriesMap = computed(() => {
   const map = new Map<string, number>();
-  (stats.value?.monthEntries || []).forEach((e) => map.set(e.date, e.rating));
-  if (stats.value?.todayEntry) map.set(stats.value.todayEntry.date, stats.value.todayEntry.rating);
+  entriesMapFull.value.forEach((e, key) => map.set(key, e.rating));
   return map;
 });
 
@@ -233,6 +316,68 @@ function cellStyle(day: number) {
   const rating = entriesMap.value.get(dayKey(day));
   if (rating === undefined) return { background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" };
   return { background: ratingToColor(rating), border: "1px solid rgba(255,255,255,.14)" };
+}
+
+// Tooltip state
+const tooltipDay = ref<number | null>(null);
+const tooltipPosition = ref({ x: 0, y: 0 });
+
+function showTooltip(day: number, event: MouseEvent) {
+  const entry = entriesMapFull.value.get(dayKey(day));
+  if (!entry) return;
+  tooltipDay.value = day;
+  const rect = (event.target as HTMLElement).getBoundingClientRect();
+  tooltipPosition.value = { x: rect.left + rect.width / 2, y: rect.top };
+}
+
+function hideTooltip() {
+  tooltipDay.value = null;
+}
+
+function getEntryForDay(day: number): MonthEntry | null {
+  return entriesMapFull.value.get(dayKey(day)) || null;
+}
+
+// Tag definitions for display
+const TAG_NAMES: Record<string, { name: string; icon: string }> = {
+  productive: { name: 'Productif', icon: '✅' },
+  useful_meeting: { name: 'Reunion utile', icon: '🤝' },
+  project_progress: { name: 'Projet avance', icon: '📈' },
+  recognition: { name: 'Reconnaissance', icon: '🏆' },
+  overload: { name: 'Surcharge', icon: '😫' },
+  useless_meeting: { name: 'Reunion inutile', icon: '🙄' },
+  work_conflict: { name: 'Conflit', icon: '⚡' },
+  deadline: { name: 'Deadline', icon: '⏰' },
+  good_exchanges: { name: 'Bons echanges', icon: '💬' },
+  party: { name: 'Soiree', icon: '🎉' },
+  family_time: { name: 'Famille', icon: '👨‍👩‍👧' },
+  new_contacts: { name: 'Nouveaux contacts', icon: '🤗' },
+  social_conflict: { name: 'Conflit social', icon: '😤' },
+  loneliness: { name: 'Solitude', icon: '😔' },
+  misunderstanding: { name: 'Malentendu', icon: '😕' },
+  sport: { name: 'Sport', icon: '🏃' },
+  good_sleep: { name: 'Bien dormi', icon: '😴' },
+  energy: { name: 'Energie', icon: '⚡' },
+  sick: { name: 'Malade', icon: '🤒' },
+  tired: { name: 'Fatigue', icon: '😩' },
+  bad_sleep: { name: 'Mal dormi', icon: '😵' },
+  pain: { name: 'Douleurs', icon: '🤕' },
+  hobby: { name: 'Hobby', icon: '🎨' },
+  accomplishment: { name: 'Accomplissement', icon: '🎯' },
+  relaxation: { name: 'Detente', icon: '🧘' },
+  good_news: { name: 'Bonne nouvelle', icon: '📰' },
+  procrastination: { name: 'Procrastination', icon: '📱' },
+  anxiety: { name: 'Anxiete', icon: '😰' },
+  bad_news: { name: 'Mauvaise nouvelle', icon: '😢' },
+  good_weather: { name: 'Beau temps', icon: '☀️' },
+  weekend: { name: 'Week-end', icon: '🎊' },
+  bad_weather: { name: 'Mauvais temps', icon: '🌧️' },
+  transport_issues: { name: 'Transports', icon: '🚇' },
+  unexpected: { name: 'Imprevu', icon: '😱' },
+};
+
+function getTagDisplay(tagId: string) {
+  return TAG_NAMES[tagId] || { name: tagId, icon: '🏷️' };
 }
 
 // Heatmap
@@ -505,9 +650,81 @@ function getBadgeName(key: string): string {
             </div>
             <div class="calendar-grid">
               <div v-for="i in firstDayOffset" :key="'empty-' + i" class="cal-day empty"></div>
-              <div v-for="d in monthDays" :key="'day-' + d" class="cal-day" :style="cellStyle(d)">
+              <div
+                v-for="d in monthDays"
+                :key="'day-' + d"
+                class="cal-day"
+                :class="{ 'cal-day--has-entry': entriesMap.get(dayKey(d)) !== undefined }"
+                :style="cellStyle(d)"
+                @mouseenter="showTooltip(d, $event)"
+                @mouseleave="hideTooltip"
+              >
                 <span class="day-num">{{ d }}</span>
                 <span class="day-score" v-if="entriesMap.get(dayKey(d)) !== undefined">{{ entriesMap.get(dayKey(d)) }}</span>
+
+                <!-- Tooltip -->
+                <div v-if="tooltipDay === d && getEntryForDay(d)" class="cal-tooltip">
+                  <div class="tooltip-header">
+                    <span class="tooltip-date">{{ dayKey(d) }}</span>
+                    <span class="tooltip-rating">{{ getEntryForDay(d)?.rating }}/20</span>
+                  </div>
+                  <div v-if="getEntryForDay(d)?.description" class="tooltip-comment">
+                    "{{ getEntryForDay(d)?.description }}"
+                  </div>
+                  <div v-if="getEntryForDay(d)?.tags?.length" class="tooltip-tags">
+                    <span
+                      v-for="tag in getEntryForDay(d)?.tags"
+                      :key="tag"
+                      class="tooltip-tag"
+                    >
+                      {{ getTagDisplay(tag).icon }} {{ getTagDisplay(tag).name }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tag Analysis Section -->
+          <div class="tags-section" v-if="tagStats && (tagStats.topPositive?.length || tagStats.topNegative?.length)">
+            <div class="section-title">📊 Analyse des facteurs</div>
+
+            <div class="tags-grid">
+              <!-- Positive impacts -->
+              <div class="tags-column" v-if="tagStats.topPositive?.length">
+                <div class="tags-column-title positive">👍 Impact positif</div>
+                <div class="tag-impact-list">
+                  <div v-for="t in tagStats.topPositive" :key="t.tag" class="tag-impact-item positive">
+                    <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
+                    <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
+                    <span class="tag-impact-value">+{{ t.impact.toFixed(1) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Negative impacts -->
+              <div class="tags-column" v-if="tagStats.topNegative?.length">
+                <div class="tags-column-title negative">👎 Impact negatif</div>
+                <div class="tag-impact-list">
+                  <div v-for="t in tagStats.topNegative" :key="t.tag" class="tag-impact-item negative">
+                    <span class="tag-icon">{{ getTagDisplay(t.tag).icon }}</span>
+                    <span class="tag-name">{{ getTagDisplay(t.tag).name }}</span>
+                    <span class="tag-impact-value">{{ t.impact.toFixed(1) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Most used tags -->
+            <div class="tags-distribution" v-if="tagStats.distribution?.length">
+              <div class="distribution-title">Tags les plus utilises</div>
+              <div class="distribution-bars">
+                <div v-for="t in tagStats.distribution.slice(0, 8)" :key="t.tag" class="distribution-item">
+                  <div class="distribution-bar-container">
+                    <div class="distribution-bar" :style="{ width: `${Math.min(t.percent * 3, 100)}%` }"></div>
+                  </div>
+                  <span class="distribution-label">{{ getTagDisplay(t.tag).icon }} {{ t.count }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -589,6 +806,34 @@ function getBadgeName(key: string): string {
                 class="grid-line" />
               <polyline :points="globalLinePoints" class="global-line-main" fill="none" />
             </svg>
+          </div>
+
+          <!-- Daily Leaderboard -->
+          <div class="lb-section daily-section" v-if="dailyLeaderboard.length">
+            <div class="lb-title">📊 Classement du jour</div>
+            <div class="lb-list">
+              <div v-for="entry in dailyLeaderboard.slice(0, 5)" :key="entry.userId" class="lb-row">
+                <div class="rank" :class="getMedalClass(entry.rank - 1)">{{ entry.rank }}</div>
+                <div class="lb-user">{{ entry.username }}</div>
+                <div class="lb-tags" v-if="entry.tags?.length">
+                  <span v-for="tag in entry.tags.slice(0, 3)" :key="tag" class="mini-tag">{{ getTagDisplay(tag).icon }}</span>
+                </div>
+                <div class="lb-score">{{ entry.rating }}/20</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detective Leaderboard -->
+          <div class="lb-section detective-section" v-if="detectiveLeaderboard.length">
+            <div class="lb-title">🕵️ Top Detectives</div>
+            <div class="lb-list">
+              <div v-for="(entry, index) in detectiveLeaderboard.slice(0, 5)" :key="entry.userId" class="lb-row">
+                <div class="rank" :class="getMedalClass(index)">{{ index + 1 }}</div>
+                <div class="lb-user">{{ entry.username }}</div>
+                <div class="lb-score">{{ entry.accuracy }}%</div>
+                <div class="lb-sub">({{ entry.correctGuesses }}/{{ entry.totalGuesses }})</div>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -841,6 +1086,7 @@ function getBadgeName(key: string): string {
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 
 .cal-day {
+  position: relative;
   border-radius: 6px;
   min-height: 36px;
   padding: 4px;
@@ -848,6 +1094,7 @@ function getBadgeName(key: string): string {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 .cal-day.empty { background: transparent !important; border: none !important; }
@@ -999,10 +1246,209 @@ function getBadgeName(key: string): string {
   transition: width 0.3s ease;
 }
 
+/* Calendar Tooltip */
+.cal-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 12px;
+  background: rgba(25, 28, 50, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease;
+}
+
+.cal-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-date {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.tooltip-rating {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffcc00;
+}
+
+.tooltip-comment {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.85;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.tooltip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tooltip-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* Tags Analysis Section */
+.tags-section {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.tags-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tags-column-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.tags-column-title.positive { color: #4ade80; }
+.tags-column-title.negative { color: #f87171; }
+
+.tag-impact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-impact-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.tag-impact-item.positive { background: rgba(74,222,128,.1); }
+.tag-impact-item.negative { background: rgba(248,113,113,.1); }
+
+.tag-icon { font-size: 14px; }
+.tag-name { flex: 1; }
+.tag-impact-value { font-weight: 800; font-size: 13px; }
+.tag-impact-item.positive .tag-impact-value { color: #4ade80; }
+.tag-impact-item.negative .tag-impact-value { color: #f87171; }
+
+.tags-distribution { margin-top: 12px; }
+
+.distribution-title {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: .7;
+  margin-bottom: 8px;
+}
+
+.distribution-bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.distribution-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+}
+
+.distribution-bar-container {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.distribution-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 3px;
+}
+
+.distribution-label {
+  font-size: 10px;
+  opacity: .7;
+  min-width: 40px;
+}
+
+/* Daily & Detective sections */
+.daily-section, .detective-section {
+  margin-top: 12px;
+}
+
+.lb-tags {
+  display: flex;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+.mini-tag {
+  font-size: 12px;
+}
+
+.lb-sub {
+  font-size: 10px;
+  opacity: .6;
+  margin-left: 4px;
+}
+
 @media (max-width: 768px) {
   .stats-cards { grid-template-columns: repeat(2, 1fr); }
   .graphs-row { grid-template-columns: 1fr; }
   .leaderboards { grid-template-columns: 1fr; }
   .global-summary { grid-template-columns: 1fr; }
+  .tags-grid { grid-template-columns: 1fr; }
 }
 </style>

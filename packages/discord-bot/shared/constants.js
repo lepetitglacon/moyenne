@@ -10,6 +10,7 @@ const DISPLAY_MODES = {
   TOP3: "top3",
   TOP5: "top5",
   FULL: "full",
+  FULL_TAGS: "full-tags",
   ANONYMOUS: "anonymous",
   STATS: "stats",
   HIGHLIGHTS: "highlights",
@@ -23,10 +24,51 @@ const DISPLAY_MODE_DESCRIPTIONS = {
   top3: "Podium + meilleur commentaire + stats (défaut)",
   top5: "Top 5 + meilleur commentaire + stats",
   full: "Tous les participants avec notes et commentaires",
+  "full-tags": "Tous les participants avec notes et tags (sans commentaires)",
   anonymous: "Comme top3/5 mais sans noms (juste notes)",
   stats: "Focus statistiques : moyenne, médiane, écart-type, tendances",
   highlights: "Extrêmes uniquement : meilleure note, pire note, meilleur commentaire",
   compact: "Liste inline (🥇 Alice 9 · 🥈 Bob 8 · ...)",
+};
+
+/**
+ * Tag emoji mappings
+ */
+const TAG_EMOJIS = {
+  productive: '✅',
+  useful_meeting: '🤝',
+  project_progress: '📈',
+  recognition: '🏆',
+  overload: '😫',
+  useless_meeting: '🙄',
+  work_conflict: '⚡',
+  deadline: '⏰',
+  good_exchanges: '💬',
+  party: '🎉',
+  family_time: '👨‍👩‍👧',
+  new_contacts: '🤗',
+  social_conflict: '😤',
+  loneliness: '😔',
+  misunderstanding: '😕',
+  sport: '🏃',
+  good_sleep: '😴',
+  energy: '⚡',
+  sick: '🤒',
+  tired: '😩',
+  bad_sleep: '😵',
+  pain: '🤕',
+  hobby: '🎨',
+  accomplishment: '🎯',
+  relaxation: '🧘',
+  good_news: '📰',
+  procrastination: '📱',
+  anxiety: '😰',
+  bad_news: '😢',
+  good_weather: '☀️',
+  weekend: '🎊',
+  bad_weather: '🌧️',
+  transport_issues: '🚇',
+  unexpected: '😱',
 };
 
 /**
@@ -133,4 +175,5 @@ module.exports = {
   PROGRESS_BAR,
   DEFAULT_TIMEZONE,
   REMINDER_DEFAULTS,
+  TAG_EMOJIS,
 };

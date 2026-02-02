@@ -88,5 +88,26 @@ export function createBotRoutes({ statsService, authenticateBot, logger }) {
     }
   });
 
+  // Get daily leaderboard
+  router.get("/recap/leaderboard/daily", authenticateBot, async (req, res, next) => {
+    try {
+      const data = await statsService.getDailyLeaderboard({ date: req.query.date });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get detective leaderboard
+  router.get("/recap/leaderboard/detectives", authenticateBot, async (req, res, next) => {
+    try {
+      const limit = parseInt(req.query.limit) || 10;
+      const data = await statsService.getDetectiveLeaderboard({ limit });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

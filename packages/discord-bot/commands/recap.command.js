@@ -219,6 +219,20 @@ const command = new SlashCommandBuilder()
           .setMaxValue(30)
       )
   )
+  .addSubcommand((sub) =>
+    sub
+      .setName("daily")
+      .setDescription("Affiche le classement du jour")
+      .addStringOption((option) =>
+        option
+          .setName("date")
+          .setDescription("Date au format YYYY-MM-DD (défaut: aujourd'hui)")
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((sub) =>
+    sub.setName("detectives").setDescription("Affiche le classement des détectives")
+  )
   // ═══════════════════════════════════════════════════════════════
   // USER COMMANDS
   // ═══════════════════════════════════════════════════════════════

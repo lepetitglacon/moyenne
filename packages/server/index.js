@@ -25,6 +25,7 @@ import {
   createRatingRepository,
   createAssignmentRepository,
   createBadgeRepository,
+  createGuessRepository,
 } from "./infrastructure/index.js";
 
 // Application
@@ -57,6 +58,7 @@ const entryRepo = createEntryRepository(pool);
 const ratingRepo = createRatingRepository(pool);
 const assignmentRepo = createAssignmentRepository(pool);
 const badgeRepo = createBadgeRepository(pool);
+const guessRepo = createGuessRepository(pool);
 
 // Initialize loggers
 const logAuth = new Logger("Auth");
@@ -65,9 +67,9 @@ const logBot = new Logger("Bot");
 
 // Initialize services
 const authService = createAuthService({ userRepo, config, logger: logAuth });
-const badgeService = createBadgeService({ badgeRepo, entryRepo, ratingRepo, logger: logAPI });
-const entryService = createEntryService({ entryRepo, ratingRepo, assignmentRepo, badgeService, logger: logAPI });
-const statsService = createStatsService({ userRepo, entryRepo, ratingRepo, badgeService, logger: logBot });
+const badgeService = createBadgeService({ badgeRepo, entryRepo, ratingRepo, guessRepo, logger: logAPI });
+const entryService = createEntryService({ entryRepo, ratingRepo, assignmentRepo, guessRepo, badgeService, logger: logAPI });
+const statsService = createStatsService({ userRepo, entryRepo, ratingRepo, guessRepo, badgeService, logger: logBot });
 
 // Initialize middlewares
 const authenticateToken = createAuthMiddleware(config, logAuth);

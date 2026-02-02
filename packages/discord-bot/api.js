@@ -92,6 +92,21 @@ async function checkUser(username) {
   }
 }
 
+/**
+ * Récupère le classement du jour
+ */
+async function getDailyLeaderboard(date = null) {
+  const dateParam = date || new Date().toISOString().split("T")[0];
+  return callApi(`/recap/leaderboard/daily?date=${dateParam}`);
+}
+
+/**
+ * Récupère le classement des détectives
+ */
+async function getDetectiveLeaderboard(limit = 10) {
+  return callApi(`/recap/leaderboard/detectives?limit=${limit}`);
+}
+
 module.exports = {
   callApi,
   getDayRecap,
@@ -101,4 +116,6 @@ module.exports = {
   getLeaderboard,
   getUsers,
   checkUser,
+  getDailyLeaderboard,
+  getDetectiveLeaderboard,
 };

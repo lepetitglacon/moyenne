@@ -40,6 +40,34 @@ export const BADGE_DEFINITIONS = {
     icon: '📝',
     requirement: 100,
   },
+  detective_10: {
+    id: 'detective_10',
+    name: 'Apprenti Detective',
+    description: '10 bonnes devinettes',
+    icon: '🔍',
+    requirement: 10,
+  },
+  detective_50: {
+    id: 'detective_50',
+    name: 'Detective Confirme',
+    description: '50 bonnes devinettes',
+    icon: '🕵️',
+    requirement: 50,
+  },
+  detective_streak_5: {
+    id: 'detective_streak_5',
+    name: 'Serie de 5',
+    description: '5 bonnes devinettes de suite',
+    icon: '🎯',
+    requirement: 5,
+  },
+  sherlock: {
+    id: 'sherlock',
+    name: 'Sherlock',
+    description: '90% de precision (min 20 guesses)',
+    icon: '🎩',
+    requirement: 90,
+  },
 };
 
 /**
@@ -54,7 +82,7 @@ export const BADGE_DEFINITIONS = {
  * Create badge service instance
  * @param {BadgeDependencies} deps
  */
-export function createBadgeService({ badgeRepo, entryRepo, ratingRepo, logger }) {
+export function createBadgeService({ badgeRepo, entryRepo, ratingRepo, guessRepo, logger }) {
   return {
     /**
      * Get all badge definitions
@@ -196,6 +224,80 @@ export function createBadgeService({ badgeRepo, entryRepo, ratingRepo, logger })
      */
     async checkAllBadgesAfterRating(userId) {
       return this.checkReviewerBadge(userId);
+    },
+
+    /**
+     * Check and award detective badges
+     * @param {number} userId
+     * @param {Object} guessStats - { correctGuesses, totalGuesses, accuracy, streak }
+     * @returns {Promise<string[]>}
+     */
+    async checkDetectiveBadges(userId, guessStats) {
+      const awarded = [];
+
+      if (!guessStats) return awarded;
+
+      // Detective 10 - 10 correct guesses
+      if (guessStats.correctGuesses >= 10) {
+        const has10 = await badgeRepo.hasBadge(userId, 'detective_10');
+        if (!has10) {
+          await badgeRepo.award(userId, 'detective_10', { correctGuesses: guessStats.correctGuesses });
+          awarded.push('detective_10');
+          logger?.info('Badge attribue: detective_10', { userId, correctGuesses: guessStats.correctGuesses });
+        }
+      }
+
+      // Detective 50 - 50 correct guesses
+      if (guessStats.correctGuesses >= 50) {
+        const has50 = await badgeRepo.hasBadge(userId, 'detective_50');
+        if (!has50) {
+          await badgeRepo.award(userId, 'detective_50', { correctGuesses: guessStats.correctGuesses });
+          awarded.push('detective_50');
+          logger?.info('Badge attribue: detective_50', { userId, correctGuesses: guessStats.correctGuesses });
+        }
+      }
+
+      // Detective streak 5 - 5 consecutive correct guesses
+      if (guessStats.streak >= 5) {
+        const hasStreak5 = await badgeRepo.hasBadge(userId, 'detective_streak_5');
+        if (!hasStreak5) {
+          await badgeRepo.award(userId, 'detective_streak_5', { streak: guessStats.streak });
+          awarded.push('detective_streak_5');
+          logger?.info('Badge attribue: detective_streak_5', { userId, streak: guessStats.streak });
+        }
+      }
+
+      // Sherlock - 90% accuracy with min 20 guesses
+      if (guessStats.totalGuesses >= 20 && guessStats.accuracy >= 90) {
+        const hasSherlock = await badgeRepo.hasBadge(userId, 'sherlock');
+        if (!hasSherlock) {
+          await badgeRepo.award(userId, 'sherlock', {
+            accuracy: guessStats.accuracy,
+            totalGuesses: guessStats.totalGuesses
+          });
+          awarded.push('sherlock');
+          logger?.info('Badge attribue: sherlock', { userId, accuracy: guessStats.accuracy });
+        }
+      }
+
+      return awarded;
+    },
+
+    /**
+     * Check all badges after a guess
+     * @param {number} userId
+     * @returns {Promise<string[]>}
+     */
+    async checkAllBadgesAfterGuess(userId) {
+      if (!guessRepo) return [];
+
+      const stats = await guessRepo.getStats(userId);
+      const streak = await guessRepo.getStreak(userId);
+
+      return this.checkDetectiveBadges(userId, {
+        ...stats,
+        streak,
+      });
     },
 
     /**

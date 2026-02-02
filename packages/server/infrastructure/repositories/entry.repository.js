@@ -173,11 +173,11 @@ export function createEntryRepository(pool) {
      * @param {number} userId
      * @param {string} startDate - YYYY-MM-DD
      * @param {string} endDate - YYYY-MM-DD
-     * @returns {Promise<{ date: string, rating: number }[]>}
+     * @returns {Promise<{ date: string, rating: number, description: string|null, tags: string[] }[]>}
      */
     async listByUserAndRange(userId, startDate, endDate) {
       const result = await pool.query(
-        `SELECT date, rating
+        `SELECT date, rating, description, COALESCE(tags, '[]') as tags
          FROM entries
          WHERE user_id = $1
            AND date >= $2
@@ -185,7 +185,10 @@ export function createEntryRepository(pool) {
          ORDER BY date ASC`,
         [userId, startDate, endDate]
       );
-      return result.rows;
+      return result.rows.map(row => ({
+        ...row,
+        tags: Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]'),
+      }));
     },
 
     /**
@@ -422,6 +425,145 @@ export function createEntryRepository(pool) {
         `SELECT ROUND(AVG(rating)::numeric, 1) as avg FROM entries`
       );
       return result.rows[0]?.avg ? parseFloat(result.rows[0].avg) : null;
+    },
+
+    /**
+     * Get average rating by tag
+     * @param {number} [userId] - Optional user filter
+     * @returns {Promise<{ tag: string, avgRating: number, count: number }[]>}
+     */
+    async getAverageByTag(userId) {
+      const userFilter = userId ? 'AND e.user_id = $1' : '';
+      const params = userId ? [userId] : [];
+
+      const result = await pool.query(
+        `SELECT
+           tag,
+           ROUND(AVG(e.rating)::numeric, 1) as avg_rating,
+           COUNT(*)::int as count
+         FROM entries e,
+              jsonb_array_elements_text(COALESCE(e.tags, '[]'::jsonb)) as tag
+         WHERE jsonb_array_length(COALESCE(e.tags, '[]'::jsonb)) > 0
+         ${userFilter}
+         GROUP BY tag
+         ORDER BY count DESC`,
+        params
+      );
+
+      return result.rows.map(row => ({
+        tag: row.tag,
+        avgRating: parseFloat(row.avg_rating),
+        count: row.count,
+      }));
+    },
+
+    /**
+     * Get tag distribution (frequency)
+     * @param {number} [userId] - Optional user filter
+     * @returns {Promise<{ tag: string, count: number, percent: number }[]>}
+     */
+    async getTagDistribution(userId) {
+      const userFilter = userId ? 'WHERE e.user_id = $1' : '';
+      const params = userId ? [userId] : [];
+
+      // Get total entries count
+      const totalResult = await pool.query(
+        `SELECT COUNT(*)::int as total FROM entries e ${userFilter}`,
+        params
+      );
+      const totalEntries = totalResult.rows[0]?.total || 1;
+
+      const result = await pool.query(
+        `SELECT
+           tag,
+           COUNT(*)::int as count
+         FROM entries e,
+              jsonb_array_elements_text(COALESCE(e.tags, '[]'::jsonb)) as tag
+         ${userFilter ? userFilter + ' AND' : 'WHERE'} jsonb_array_length(COALESCE(e.tags, '[]'::jsonb)) > 0
+         GROUP BY tag
+         ORDER BY count DESC`,
+        params
+      );
+
+      return result.rows.map(row => ({
+        tag: row.tag,
+        count: row.count,
+        percent: Math.round((row.count / totalEntries) * 1000) / 10,
+      }));
+    },
+
+    /**
+     * Get tag correlations (impact on rating)
+     * Compares average rating with tag vs without tag
+     * @param {number} [userId] - Optional user filter
+     * @returns {Promise<{ tag: string, withTag: number, withoutTag: number, impact: number }[]>}
+     */
+    async getTagCorrelations(userId) {
+      const userFilter = userId ? 'AND user_id = $1' : '';
+      const params = userId ? [userId] : [];
+
+      // Get global average
+      const globalResult = await pool.query(
+        `SELECT ROUND(AVG(rating)::numeric, 2) as avg FROM entries WHERE 1=1 ${userFilter}`,
+        params
+      );
+      const globalAvg = parseFloat(globalResult.rows[0]?.avg) || 10;
+
+      // Get average per tag
+      const tagsResult = await pool.query(
+        `SELECT
+           tag,
+           ROUND(AVG(e.rating)::numeric, 2) as avg_with_tag,
+           COUNT(*)::int as count
+         FROM entries e,
+              jsonb_array_elements_text(COALESCE(e.tags, '[]'::jsonb)) as tag
+         WHERE jsonb_array_length(COALESCE(e.tags, '[]'::jsonb)) > 0
+         ${userFilter}
+         GROUP BY tag
+         HAVING COUNT(*) >= 3
+         ORDER BY AVG(e.rating) DESC`,
+        params
+      );
+
+      return tagsResult.rows.map(row => {
+        const withTag = parseFloat(row.avg_with_tag);
+        const impact = Math.round((withTag - globalAvg) * 10) / 10;
+        return {
+          tag: row.tag,
+          withTag,
+          withoutTag: globalAvg,
+          impact,
+          count: row.count,
+        };
+      });
+    },
+
+    /**
+     * Get daily leaderboard for a specific date
+     * @param {string} date - YYYY-MM-DD
+     * @returns {Promise<{ rank: number, userId: number, username: string, rating: number, tags: string[] }[]>}
+     */
+    async getDailyLeaderboard(date) {
+      const result = await pool.query(
+        `SELECT
+           e.user_id,
+           u.username,
+           e.rating,
+           COALESCE(e.tags, '[]') as tags
+         FROM entries e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.date = $1
+         ORDER BY e.rating DESC, u.username ASC`,
+        [date]
+      );
+
+      return result.rows.map((row, index) => ({
+        rank: index + 1,
+        userId: row.user_id,
+        username: row.username,
+        rating: parseInt(row.rating, 10),
+        tags: Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]'),
+      }));
     },
   };
 }

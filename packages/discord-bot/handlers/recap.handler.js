@@ -175,6 +175,12 @@ function createRecapHandler({
           case "history":
             await this._handleHistory(interaction);
             break;
+          case "daily":
+            await this._handleDaily(interaction);
+            break;
+          case "detectives":
+            await this._handleDetectives(interaction);
+            break;
 
           // User commands
           case "link":
@@ -574,6 +580,47 @@ function createRecapHandler({
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
         logger?.error("Erreur history", { error: error.message });
+        await replyError(interaction, MESSAGES.API_ERROR);
+      }
+    },
+
+    async _handleDaily(interaction) {
+      await interaction.deferReply({ ephemeral: false });
+
+      try {
+        const dateOption = interaction.options.getString("date");
+        const data = await apiClient.getDailyLeaderboard(dateOption);
+        const config = await configRepo.get();
+
+        if (!embedBuilderService) {
+          await replyError(interaction, "Service non disponible.");
+          return;
+        }
+
+        const embed = await embedBuilderService.buildDailyLeaderboard(data, config);
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        logger?.error("Erreur daily", { error: error.message });
+        await replyError(interaction, MESSAGES.API_ERROR);
+      }
+    },
+
+    async _handleDetectives(interaction) {
+      await interaction.deferReply({ ephemeral: false });
+
+      try {
+        const data = await apiClient.getDetectiveLeaderboard(10);
+        const config = await configRepo.get();
+
+        if (!embedBuilderService) {
+          await replyError(interaction, "Service non disponible.");
+          return;
+        }
+
+        const embed = await embedBuilderService.buildDetectiveLeaderboard(data, config);
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        logger?.error("Erreur detectives", { error: error.message });
         await replyError(interaction, MESSAGES.API_ERROR);
       }
     },

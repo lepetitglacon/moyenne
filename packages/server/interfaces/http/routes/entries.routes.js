@@ -57,12 +57,23 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
     }
   });
 
-  // Add rating
+  // Add rating (with optional guess)
   router.post("/ratings", authenticateToken, async (req, res, next) => {
     try {
-      const { toUserId, date, rating } = req.body;
-      await entryService.saveRating({ fromUserId: req.user.id, toUserId, date, rating });
-      res.json({ message: "Rating saved" });
+      const { toUserId, date, rating, guessedUserId } = req.body;
+      const result = await entryService.saveRating({
+        fromUserId: req.user.id,
+        toUserId,
+        date,
+        rating,
+        guessedUserId: guessedUserId || null,
+      });
+
+      res.json({
+        message: "Rating saved",
+        newBadges: result.newBadges || [],
+        guessResult: result.guessResult || null,
+      });
     } catch (err) {
       next(err);
     }

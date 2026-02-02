@@ -91,5 +91,59 @@ export function createStatsRoutes({ statsService, authenticateToken }) {
     }
   });
 
+  // Get tag stats for current user
+  router.get("/me/tags-stats", authenticateToken, async (req, res, next) => {
+    try {
+      const data = await statsService.getTagStats({ userId: req.user.id });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get global tag stats
+  router.get("/tags-stats", authenticateToken, async (req, res, next) => {
+    try {
+      const data = await statsService.getTagStats({});
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get daily leaderboard
+  router.get("/leaderboard/daily", authenticateToken, async (req, res, next) => {
+    try {
+      const data = await statsService.getDailyLeaderboard({
+        date: req.query.date,
+      });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get detective leaderboard
+  router.get("/leaderboard/detectives", authenticateToken, async (req, res, next) => {
+    try {
+      const data = await statsService.getDetectiveLeaderboard({
+        limit: req.query.limit ? Number(req.query.limit) : 10,
+      });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Get detective stats for current user
+  router.get("/me/detective-stats", authenticateToken, async (req, res, next) => {
+    try {
+      const data = await statsService.getDetectiveStats({ userId: req.user.id });
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

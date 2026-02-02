@@ -66,6 +66,48 @@ const badgeNames: Record<string, { name: string; icon: string }> = {
   top_1_monthly: { name: "Top 1", icon: "🥇" },
 };
 
+// Tag definitions for preview display
+const TAGS: Record<string, { name: string; icon: string; positive: boolean }> = {
+  productive: { name: 'Productif', icon: '✅', positive: true },
+  useful_meeting: { name: 'Reunion utile', icon: '🤝', positive: true },
+  project_progress: { name: 'Projet avance', icon: '📈', positive: true },
+  recognition: { name: 'Reconnaissance', icon: '🏆', positive: true },
+  overload: { name: 'Surcharge', icon: '😫', positive: false },
+  useless_meeting: { name: 'Reunion inutile', icon: '🙄', positive: false },
+  work_conflict: { name: 'Conflit travail', icon: '⚡', positive: false },
+  deadline: { name: 'Deadline', icon: '⏰', positive: false },
+  good_exchanges: { name: 'Bons echanges', icon: '💬', positive: true },
+  party: { name: 'Soiree', icon: '🎉', positive: true },
+  family_time: { name: 'Famille', icon: '👨‍👩‍👧', positive: true },
+  new_contacts: { name: 'Nouveaux contacts', icon: '🤗', positive: true },
+  social_conflict: { name: 'Conflit', icon: '😤', positive: false },
+  loneliness: { name: 'Solitude', icon: '😔', positive: false },
+  misunderstanding: { name: 'Malentendu', icon: '😕', positive: false },
+  sport: { name: 'Sport', icon: '🏃', positive: true },
+  good_sleep: { name: 'Bien dormi', icon: '😴', positive: true },
+  energy: { name: 'Energie', icon: '⚡', positive: true },
+  sick: { name: 'Malade', icon: '🤒', positive: false },
+  tired: { name: 'Fatigue', icon: '😩', positive: false },
+  bad_sleep: { name: 'Mal dormi', icon: '😵', positive: false },
+  pain: { name: 'Douleurs', icon: '🤕', positive: false },
+  hobby: { name: 'Hobby', icon: '🎨', positive: true },
+  accomplishment: { name: 'Accomplissement', icon: '🎯', positive: true },
+  relaxation: { name: 'Detente', icon: '🧘', positive: true },
+  good_news: { name: 'Bonne nouvelle', icon: '📰', positive: true },
+  procrastination: { name: 'Procrastination', icon: '📱', positive: false },
+  anxiety: { name: 'Anxiete', icon: '😰', positive: false },
+  bad_news: { name: 'Mauvaise nouvelle', icon: '😢', positive: false },
+  good_weather: { name: 'Beau temps', icon: '☀️', positive: true },
+  weekend: { name: 'Week-end', icon: '🎊', positive: true },
+  bad_weather: { name: 'Mauvais temps', icon: '🌧️', positive: false },
+  transport_issues: { name: 'Transports', icon: '🚇', positive: false },
+  unexpected: { name: 'Imprevu', icon: '😱', positive: false },
+};
+
+function getTagInfo(tagId: string) {
+  return TAGS[tagId] || { name: tagId, icon: '🏷️', positive: true };
+}
+
 // Load today's entry if exists (for editing)
 onMounted(async () => {
   loading.value = true;
@@ -188,8 +230,10 @@ function toggleTagSection() {
               v-for="tagId in selectedTags.slice(0, 5)"
               :key="tagId"
               class="preview-tag"
+              :class="{ 'preview-tag--positive': getTagInfo(tagId).positive, 'preview-tag--negative': !getTagInfo(tagId).positive }"
             >
-              {{ tagId }}
+              <span class="preview-tag-icon">{{ getTagInfo(tagId).icon }}</span>
+              <span class="preview-tag-name">{{ getTagInfo(tagId).name }}</span>
             </span>
             <span v-if="selectedTags.length > 5" class="preview-more">
               +{{ selectedTags.length - 5 }}
@@ -299,22 +343,45 @@ function toggleTagSection() {
   justify-content: center;
   gap: 6px;
   margin-bottom: 12px;
-  max-width: 320px;
+  max-width: 400px;
 }
 
 .preview-tag {
-  padding: 3px 8px;
-  font-size: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  opacity: 0.7;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview-tag--positive {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+
+.preview-tag--negative {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.preview-tag-icon {
+  font-size: 12px;
+}
+
+.preview-tag-name {
+  font-weight: 500;
 }
 
 .preview-more {
-  padding: 3px 8px;
-  font-size: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border-radius: 14px;
   font-weight: 600;
 }
 

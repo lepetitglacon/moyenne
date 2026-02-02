@@ -15,6 +15,7 @@
  * @property {string} username
  * @property {number} rating
  * @property {string|null} description
+ * @property {string[]} tags
  */
 
 /**
@@ -55,6 +56,7 @@ export function getTopN(entries, n = 3) {
     username: e.username,
     rating: e.rating,
     description: e.description || null,
+    tags: e.tags || [],
   }));
 }
 

@@ -52,7 +52,7 @@ import { NotFoundError } from "../shared/errors.js";
  * Create stats service instance
  * @param {StatsDependencies} deps
  */
-export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeService, logger }) {
+export function createStatsService({ userRepo, entryRepo, ratingRepo, guessRepo, badgeService, logger }) {
   /**
    * Get stats for a user (internal helper)
    * @param {number} userId
@@ -73,6 +73,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeServi
       date: normalizeDate(entry.date),
       rating: parseInt(entry.rating, 10) || 0,
       description: entry.description || null,
+      tags: entry.tags || [],
     };
   }
 
@@ -92,10 +93,12 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeServi
     const allEntries = allEntriesRaw.map(e => ({ date: normalizeDate(e.date) }));
     const streakData = calculateStreak(allEntries, today);
 
-    // Normalize month entries
+    // Normalize month entries (include description and tags for tooltips)
     const monthEntries = monthEntriesRaw.map(e => ({
       date: normalizeDate(e.date),
       rating: parseInt(e.rating, 10) || 0,
+      description: e.description || null,
+      tags: e.tags || [],
     }));
 
     return {
@@ -199,6 +202,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeServi
           username: e.username,
           rating: e.rating,
           description: e.description || null,
+          tags: e.tags || [],
         })),
       };
     },
@@ -435,6 +439,93 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, badgeServi
       logger?.debug("Historique récupéré", { count: history.length });
 
       return history;
+    },
+
+    /**
+     * Get tag statistics
+     * @param {{ userId?: number }} params
+     * @returns {Promise<Object>} Tag stats with distribution, correlations, top positive/negative
+     */
+    async getTagStats({ userId } = {}) {
+      const byTag = await entryRepo.getAverageByTag(userId);
+      const distribution = await entryRepo.getTagDistribution(userId);
+      const correlations = await entryRepo.getTagCorrelations(userId);
+
+      // Sort correlations by impact
+      const sortedCorrelations = [...correlations].sort((a, b) => b.impact - a.impact);
+
+      // Get top positive and negative tags
+      const topPositive = sortedCorrelations
+        .filter(c => c.impact > 0)
+        .slice(0, 5);
+
+      const topNegative = sortedCorrelations
+        .filter(c => c.impact < 0)
+        .sort((a, b) => a.impact - b.impact)
+        .slice(0, 5);
+
+      logger?.debug("Tag stats récupérées", { userId, tagCount: byTag.length });
+
+      return {
+        byTag,
+        distribution,
+        correlations: sortedCorrelations,
+        topPositive,
+        topNegative,
+      };
+    },
+
+    /**
+     * Get daily leaderboard
+     * @param {{ date?: string }} params
+     * @returns {Promise<Object>} Daily leaderboard with entries
+     */
+    async getDailyLeaderboard({ date } = {}) {
+      const targetDate = date || getToday();
+      const entries = await entryRepo.getDailyLeaderboard(targetDate);
+
+      logger?.debug("Classement journalier récupéré", { date: targetDate, count: entries.length });
+
+      return {
+        date: targetDate,
+        entries,
+      };
+    },
+
+    /**
+     * Get detective leaderboard
+     * @param {{ limit?: number }} params
+     * @returns {Promise<Object>} Detective leaderboard
+     */
+    async getDetectiveLeaderboard({ limit = 10 } = {}) {
+      if (!guessRepo) {
+        return { leaderboard: [] };
+      }
+
+      const leaderboard = await guessRepo.getLeaderboard(limit);
+
+      logger?.debug("Classement détectives récupéré", { count: leaderboard.length });
+
+      return { leaderboard };
+    },
+
+    /**
+     * Get detective stats for a user
+     * @param {{ userId: number }} params
+     * @returns {Promise<Object>} User's detective stats
+     */
+    async getDetectiveStats({ userId }) {
+      if (!guessRepo) {
+        return { totalGuesses: 0, correctGuesses: 0, accuracy: 0, streak: 0 };
+      }
+
+      const stats = await guessRepo.getStats(userId);
+      const streak = await guessRepo.getStreak(userId);
+
+      return {
+        ...stats,
+        streak,
+      };
     },
   };
 }

@@ -8,6 +8,7 @@ const {
   MEDALS,
   RATING_COLORS,
   SEPARATORS,
+  TAG_EMOJIS,
 } = require("../shared/constants");
 const {
   formatDateFR,
@@ -152,6 +153,14 @@ function createEmbedBuilderService({ userService, logger }) {
     return text.substring(0, maxLength) + "...";
   }
 
+  /**
+   * Format tags as emoji string
+   */
+  function formatTags(tags) {
+    if (!tags || !Array.isArray(tags) || tags.length === 0) return "";
+    return tags.map(t => TAG_EMOJIS[t] || '🏷️').join(" ");
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // MODE BUILDERS
   // ═══════════════════════════════════════════════════════════════
@@ -214,13 +223,18 @@ function createEmbedBuilderService({ userService, logger }) {
       });
     }
 
-    // Best comment
+    // Best comment with tags
     if (config.show_comments !== 0) {
       const bestWithComment = findBestComment(data.top3);
       if (bestWithComment) {
+        let commentValue = `"${truncate(bestWithComment.description)}"`;
+        const tagsStr = formatTags(bestWithComment.tags);
+        if (tagsStr) {
+          commentValue += `\n${tagsStr}`;
+        }
         embed.addFields({
           name: `💬 Moment fort de ${bestWithComment.username}`,
-          value: `"${truncate(bestWithComment.description)}"`,
+          value: commentValue,
           inline: false,
         });
       }
@@ -267,6 +281,12 @@ function createEmbedBuilderService({ userService, logger }) {
 
         if (config.show_comments !== 0 && entry.description) {
           line += `\n   _"${truncate(entry.description, 100)}"_`;
+        }
+
+        // Add tags
+        const tagsStr = formatTags(entry.tags);
+        if (tagsStr) {
+          line += `\n   ${tagsStr}`;
         }
 
         if (currentLength + line.length > 900) {
@@ -477,6 +497,74 @@ function createEmbedBuilderService({ userService, logger }) {
   }
 
   /**
+   * FULL_TAGS: All participants with tags (no comments)
+   */
+  async function buildFullTagsEmbed(data, config) {
+    const embed = createBaseEmbed(data, config);
+    const linkMap = await userService.getAllLinksMap();
+
+    if (data.participantCount === 0) {
+      embed.setDescription("😴 **Aucune participation aujourd'hui...**\nRevenez demain !");
+      return embed;
+    }
+
+    // Stats
+    if (config.show_stats !== 0) {
+      embed.addFields(buildStatsFields(data, true));
+    }
+
+    // All participants with tags
+    if (data.entries && data.entries.length > 0) {
+      // Sort by rating descending
+      const sorted = [...data.entries].sort((a, b) => b.rating - a.rating);
+
+      const chunks = [];
+      let currentChunk = [];
+      let currentLength = 0;
+
+      for (let i = 0; i < sorted.length; i++) {
+        const entry = sorted[i];
+        const medal = i < 5 ? MEDALS[i] : "▫️";
+        const display = getUserDisplay(entry.username, linkMap);
+        let line = `${medal} ${display} - **${entry.rating}/20**`;
+
+        // Add tags
+        const tagsStr = formatTags(entry.tags);
+        if (tagsStr) {
+          line += `\n   ${tagsStr}`;
+        }
+
+        if (currentLength + line.length > 900) {
+          chunks.push(currentChunk.join("\n"));
+          currentChunk = [];
+          currentLength = 0;
+        }
+
+        currentChunk.push(line);
+        currentLength += line.length;
+      }
+
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk.join("\n"));
+      }
+
+      chunks.forEach((chunk, i) => {
+        embed.addFields({
+          name: i === 0 ? "👥 Participants" : "​",
+          value: chunk,
+          inline: false,
+        });
+      });
+    }
+
+    if (!config.custom_footer) {
+      embed.setFooter({ text: "À demain !" });
+    }
+
+    return embed;
+  }
+
+  /**
    * COMPACT: Inline list
    */
   async function buildCompactEmbed(data, config) {
@@ -526,6 +614,7 @@ function createEmbedBuilderService({ userService, logger }) {
     [DISPLAY_MODES.TOP3]: async (data, config) => buildTopNEmbed(data, config, 3),
     [DISPLAY_MODES.TOP5]: async (data, config) => buildTopNEmbed(data, config, 5),
     [DISPLAY_MODES.FULL]: buildFullEmbed,
+    [DISPLAY_MODES.FULL_TAGS]: buildFullTagsEmbed,
     [DISPLAY_MODES.ANONYMOUS]: buildAnonymousEmbed,
     [DISPLAY_MODES.STATS]: buildStatsEmbed,
     [DISPLAY_MODES.HIGHLIGHTS]: buildHighlightsEmbed,
@@ -781,6 +870,81 @@ function createEmbedBuilderService({ userService, logger }) {
         .join("\n");
 
       embed.setDescription(historyText);
+
+      return embed;
+    },
+
+    /**
+     * Build daily leaderboard embed
+     * @param {Object} data - Daily leaderboard data
+     * @param {Object} config - Bot configuration
+     * @returns {Promise<EmbedBuilder>}
+     */
+    async buildDailyLeaderboard(data, config) {
+      const linkMap = await userService.getAllLinksMap();
+      const dateFormatted = formatDateFR(data.date);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x3b82f6)
+        .setTitle(`📊 CLASSEMENT DU ${dateFormatted.toUpperCase()}`)
+        .setTimestamp();
+
+      if (!data.entries || data.entries.length === 0) {
+        embed.setDescription("😴 Aucune participation ce jour.");
+        return embed;
+      }
+
+      const lines = data.entries.slice(0, 10).map((entry) => {
+        const medal = entry.rank <= 5 ? MEDALS[entry.rank - 1] : `${entry.rank}.`;
+        const display = getUserDisplay(entry.username, linkMap);
+        const tagsStr = formatTags(entry.tags);
+        let line = `${medal} ${display} - **${entry.rating}/20**`;
+        if (tagsStr) {
+          line += `  ${tagsStr}`;
+        }
+        return line;
+      });
+
+      embed.setDescription(lines.join("\n"));
+
+      if (!config.custom_footer) {
+        embed.setFooter({ text: `${data.entries.length} participant(s)` });
+      }
+
+      return embed;
+    },
+
+    /**
+     * Build detective leaderboard embed
+     * @param {Object} data - Detective leaderboard data
+     * @param {Object} config - Bot configuration
+     * @returns {Promise<EmbedBuilder>}
+     */
+    async buildDetectiveLeaderboard(data, config) {
+      const linkMap = await userService.getAllLinksMap();
+
+      const embed = new EmbedBuilder()
+        .setColor(0x9333ea)
+        .setTitle("🕵️ CLASSEMENT DETECTIVES")
+        .setDescription("Top des meilleurs detecteurs d'auteurs (min. 5 guesses)")
+        .setTimestamp();
+
+      if (!data.leaderboard || data.leaderboard.length === 0) {
+        embed.setDescription("😴 Aucun detective pour l'instant.\nDevinez qui ecrit les commentaires pour apparaitre ici !");
+        return embed;
+      }
+
+      const lines = data.leaderboard.map((entry, i) => {
+        const medal = MEDALS[i] || `${i + 1}.`;
+        const display = getUserDisplay(entry.username, linkMap);
+        return `${medal} ${display} - **${entry.accuracy}%** (${entry.correctGuesses}/${entry.totalGuesses})`;
+      });
+
+      embed.addFields({
+        name: "🎯 Classement par precision",
+        value: lines.join("\n"),
+        inline: false,
+      });
 
       return embed;
     },
