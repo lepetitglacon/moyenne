@@ -69,20 +69,24 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void;
 }>();
 
+type TagType = { id: string; category: string; name: string; positive: boolean; icon: string };
+type GroupedTags = { positive: TagType[]; negative: TagType[] };
+
 // Group tags by category
-const tagsByCategory = computed(() => {
-  const grouped: Record<string, { positive: typeof TAGS[string][]; negative: typeof TAGS[string][] }> = {};
+const tagsByCategory = computed((): Record<string, GroupedTags> => {
+  const grouped: Record<string, GroupedTags> = {};
 
   for (const catId of Object.keys(TAG_CATEGORIES)) {
     grouped[catId] = { positive: [], negative: [] };
   }
 
   for (const tag of Object.values(TAGS)) {
-    if (grouped[tag.category]) {
+    const group = grouped[tag.category];
+    if (group) {
       if (tag.positive) {
-        grouped[tag.category].positive.push(tag);
+        group.positive.push(tag);
       } else {
-        grouped[tag.category].negative.push(tag);
+        group.negative.push(tag);
       }
     }
   }
@@ -132,16 +136,16 @@ function getCategoryColor(catId: string): string {
 
         <div class="tag-groups">
           <!-- Positive tags -->
-          <div class="tag-group tag-group--positive" v-if="tagsByCategory[catId]?.positive.length">
+          <div class="tag-group tag-group--positive" v-if="tagsByCategory[catId as string]?.positive?.length">
             <div class="tag-group-label">👍</div>
             <div class="tags">
               <button
-                v-for="tag in tagsByCategory[catId].positive"
+                v-for="tag in tagsByCategory[catId as string]?.positive || []"
                 :key="tag.id"
                 type="button"
                 class="tag tag--positive"
                 :class="{ 'tag--selected': isSelected(tag.id) }"
-                :style="{ '--tag-color': getCategoryColor(catId) }"
+                :style="{ '--tag-color': getCategoryColor(catId as string) }"
                 @click="toggleTag(tag.id)"
               >
                 <span class="tag-icon">{{ tag.icon }}</span>
@@ -151,11 +155,11 @@ function getCategoryColor(catId: string): string {
           </div>
 
           <!-- Negative tags -->
-          <div class="tag-group tag-group--negative" v-if="tagsByCategory[catId]?.negative.length">
+          <div class="tag-group tag-group--negative" v-if="tagsByCategory[catId as string]?.negative?.length">
             <div class="tag-group-label">👎</div>
             <div class="tags">
               <button
-                v-for="tag in tagsByCategory[catId].negative"
+                v-for="tag in tagsByCategory[catId as string]?.negative || []"
                 :key="tag.id"
                 type="button"
                 class="tag tag--negative"
