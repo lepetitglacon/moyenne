@@ -58,6 +58,23 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
    * @param {string|undefined} monthParam
    * @returns {Promise<UserStatsResult>}
    */
+  // Helper to normalize date (PostgreSQL returns Date objects)
+  function normalizeDate(date) {
+    if (!date) return null;
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return String(date).split('T')[0];
+  }
+
+  // Helper to normalize entry data
+  function normalizeEntry(entry) {
+    if (!entry) return null;
+    return {
+      date: normalizeDate(entry.date),
+      rating: parseInt(entry.rating, 10) || 0,
+      description: entry.description || null,
+    };
+  }
+
   async function getUserStatsInternal(userId, monthParam) {
     const today = getToday();
     const { monthStart, monthEnd } = getMonthRange(monthParam);
@@ -66,20 +83,28 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     const todayEntry = await entryRepo.findByUserAndDate(userId, today);
     const participationCount = await entryRepo.countByUser(userId);
     const currentMonthAvg = await entryRepo.getAvgByUserAndRange(userId, monthStart, monthEnd);
-    const monthEntries = await entryRepo.listByUserAndRange(userId, monthStart, monthEnd);
+    const monthEntriesRaw = await entryRepo.listByUserAndRange(userId, monthStart, monthEnd);
 
     // Calculate streak
-    const allEntries = await entryRepo.listAllByUser(userId);
+    const allEntriesRaw = await entryRepo.listAllByUser(userId);
+    // Normalize dates for streak calculation
+    const allEntries = allEntriesRaw.map(e => ({ date: normalizeDate(e.date) }));
     const streakData = calculateStreak(allEntries, today);
+
+    // Normalize month entries
+    const monthEntries = monthEntriesRaw.map(e => ({
+      date: normalizeDate(e.date),
+      rating: parseInt(e.rating, 10) || 0,
+    }));
 
     return {
       today,
       monthStart,
       monthEnd,
-      lastEntry: lastEntry || null,
-      todayEntry: todayEntry || null,
-      participationCount,
-      currentMonthAvg,
+      lastEntry: normalizeEntry(lastEntry),
+      todayEntry: normalizeEntry(todayEntry),
+      participationCount: parseInt(participationCount, 10) || 0,
+      currentMonthAvg: currentMonthAvg ? parseFloat(currentMonthAvg) : null,
       monthEntries,
       streak: {
         currentStreak: streakData.currentStreak,
@@ -127,7 +152,14 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       const recapDate = date || getToday();
 
       // Get entries with user info
-      const entries = await entryRepo.listByDateWithUsers(recapDate);
+      const entriesRaw = await entryRepo.listByDateWithUsers(recapDate);
+
+      // Normalize entries (PostgreSQL may return ratings as strings)
+      const entries = entriesRaw.map(e => ({
+        ...e,
+        rating: parseInt(e.rating, 10) || 0,
+        date: normalizeDate(e.date),
+      }));
 
       // Get ratings count
       const ratingsCount = await ratingRepo.countByDate(recapDate);
@@ -172,16 +204,24 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
     async getLeaderboard({ month } = {}) {
       const { monthStart, monthEnd } = getMonthRange(month);
 
-      const monthly = await entryRepo.getLeaderboardByAvg(monthStart, monthEnd);
-      const allTime = await entryRepo.getLeaderboardAllTime();
-      const topParticipants = await entryRepo.getLeaderboardByParticipation();
+      const monthlyRaw = await entryRepo.getLeaderboardByAvg(monthStart, monthEnd);
+      const allTimeRaw = await entryRepo.getLeaderboardAllTime();
+      const topParticipantsRaw = await entryRepo.getLeaderboardByParticipation();
+
+      // Normalize PostgreSQL results (lowercase columns → camelCase, strings → numbers)
+      const normalizeLeaderboard = (rows) => rows.map(row => ({
+        userId: parseInt(row.userid, 10),
+        username: row.username,
+        avgRating: parseFloat(row.avgrating) || 0,
+        entryCount: parseInt(row.entrycount, 10) || 0,
+      }));
 
       return {
         monthStart,
         monthEnd,
-        monthly,
-        allTime,
-        topParticipants,
+        monthly: normalizeLeaderboard(monthlyRaw),
+        allTime: normalizeLeaderboard(allTimeRaw),
+        topParticipants: normalizeLeaderboard(topParticipantsRaw),
       };
     },
 
@@ -194,31 +234,54 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
       const currentYear = year || new Date().getFullYear();
 
       // Monthly averages for the user (last 12 months)
-      const userMonthly = await entryRepo.getMonthlyAverages(userId, 12);
+      const userMonthlyRaw = await entryRepo.getMonthlyAverages(userId, 12);
 
       // Global monthly averages for comparison
-      const globalMonthly = await entryRepo.getGlobalMonthlyAverages(12);
+      const globalMonthlyRaw = await entryRepo.getGlobalMonthlyAverages(12);
 
       // Year entries for heatmap
-      const yearEntries = await entryRepo.getYearEntries(userId, currentYear);
+      const yearEntriesRaw = await entryRepo.getYearEntries(userId, currentYear);
 
       // Rating distribution
-      const distribution = await entryRepo.getRatingDistribution(userId);
+      const distributionRaw = await entryRepo.getRatingDistribution(userId);
 
       // Average by day of week
-      const byDayOfWeek = await entryRepo.getAverageByDayOfWeek(userId);
+      const byDayOfWeekRaw = await entryRepo.getAverageByDayOfWeek(userId);
 
       // Global average for comparison
       const globalAverage = await entryRepo.getGlobalAverage();
 
+      // Normalize PostgreSQL results (lowercase columns → camelCase, strings → numbers)
+      const normalizeMonthly = (rows) => rows.map(row => ({
+        month: row.month,
+        avgRating: parseFloat(row.avgrating) || 0,
+        entryCount: parseInt(row.entrycount, 10) || 0,
+      }));
+
+      const normalizeYearEntries = (rows) => rows.map(row => ({
+        date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
+        rating: parseInt(row.rating, 10) || 0,
+      }));
+
+      const normalizeDistribution = (rows) => rows.map(row => ({
+        rating: parseInt(row.rating, 10),
+        count: parseInt(row.count, 10) || 0,
+      }));
+
+      const normalizeByDayOfWeek = (rows) => rows.map(row => ({
+        dayOfWeek: parseInt(row.dayofweek, 10),
+        avgRating: parseFloat(row.avgrating) || 0,
+        entryCount: parseInt(row.entrycount, 10) || 0,
+      }));
+
       return {
         year: currentYear,
-        userMonthly,
-        globalMonthly,
-        yearEntries,
-        distribution,
-        byDayOfWeek,
-        globalAverage,
+        userMonthly: normalizeMonthly(userMonthlyRaw),
+        globalMonthly: normalizeMonthly(globalMonthlyRaw),
+        yearEntries: normalizeYearEntries(yearEntriesRaw),
+        distribution: normalizeDistribution(distributionRaw),
+        byDayOfWeek: normalizeByDayOfWeek(byDayOfWeekRaw),
+        globalAverage: globalAverage ? parseFloat(globalAverage) : null,
       };
     },
 
@@ -256,7 +319,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
           activeDays.add(dayStr);
           dayEntries.forEach((e) => {
             uniqueParticipants.add(e.username);
-            totalRating += e.rating;
+            totalRating += parseInt(e.rating, 10) || 0;
             totalEntries++;
           });
         }
@@ -317,9 +380,15 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
 
       while (history.length < limit && daysChecked < maxDaysToCheck) {
         const dateStr = dateObj.toISOString().split("T")[0];
-        const entries = await entryRepo.listByDateWithUsers(dateStr);
+        const entriesRaw = await entryRepo.listByDateWithUsers(dateStr);
 
-        if (entries.length > 0) {
+        if (entriesRaw.length > 0) {
+          // Normalize entries for calculateRecapStats
+          const entries = entriesRaw.map(e => ({
+            ...e,
+            rating: parseInt(e.rating, 10) || 0,
+          }));
+
           const ratingsCount = await ratingRepo.countByDate(dateStr);
           const stats = calculateRecapStats(entries, ratingsCount);
 
