@@ -221,5 +221,123 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, logger }) 
         globalAverage,
       };
     },
+
+    /**
+     * Get weekly recap (for bot)
+     * @param {{ date?: string }} params - Optional end date (defaults to today)
+     * @returns {Object} Weekly recap data
+     */
+    getWeeklyRecap({ date } = {}) {
+      const endDate = date || getToday();
+      const endDateObj = new Date(endDate);
+
+      // Calculate start of week (Monday)
+      const dayOfWeek = endDateObj.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const startDateObj = new Date(endDateObj);
+      startDateObj.setDate(startDateObj.getDate() - daysToMonday);
+      const startDate = startDateObj.toISOString().split("T")[0];
+
+      // Get all entries for the week
+      const weeklyLeaderboard = entryRepo.getLeaderboardByAvg(startDate, endDate);
+
+      // Calculate totals
+      let totalRating = 0;
+      let totalEntries = 0;
+      const uniqueParticipants = new Set();
+      const activeDays = new Set();
+
+      // For each day in the week, get entries
+      for (let d = new Date(startDate); d <= endDateObj; d.setDate(d.getDate() + 1)) {
+        const dayStr = d.toISOString().split("T")[0];
+        const dayEntries = entryRepo.listByDateWithUsers(dayStr);
+
+        if (dayEntries.length > 0) {
+          activeDays.add(dayStr);
+          dayEntries.forEach((e) => {
+            uniqueParticipants.add(e.username);
+            totalRating += e.rating;
+            totalEntries++;
+          });
+        }
+      }
+
+      const avgRating = totalEntries > 0 ? totalRating / totalEntries : 0;
+
+      // Format leaderboard
+      const leaderboard = weeklyLeaderboard.map((entry) => ({
+        username: entry.username,
+        avgRating: entry.avgRating,
+        entries: entry.entryCount,
+      }));
+
+      logger?.debug("Weekly recap récupéré", {
+        startDate,
+        endDate,
+        participantCount: uniqueParticipants.size,
+      });
+
+      return {
+        startDate,
+        endDate,
+        participantCount: uniqueParticipants.size,
+        avgRating: Math.round(avgRating * 10) / 10,
+        activeDays: activeDays.size,
+        leaderboard,
+      };
+    },
+
+    /**
+     * Get user recap stats by username (for bot)
+     * @param {{ username: string }} params
+     * @returns {Object} User stats
+     */
+    getUserRecapStats({ username }) {
+      const user = userRepo.findByUsername(username);
+      if (!user) {
+        throw new NotFoundError("User not found");
+      }
+
+      return this.getUserStats({ userId: user.id });
+    },
+
+    /**
+     * Get recap history (for bot)
+     * @param {{ limit?: number }} params
+     * @returns {Array} Last N recaps
+     */
+    getRecapHistory({ limit = 5 } = {}) {
+      const today = getToday();
+      const history = [];
+
+      // Go back from today to get last N days with data
+      const dateObj = new Date(today);
+      let daysChecked = 0;
+      const maxDaysToCheck = 60; // Don't go back more than 60 days
+
+      while (history.length < limit && daysChecked < maxDaysToCheck) {
+        const dateStr = dateObj.toISOString().split("T")[0];
+        const entries = entryRepo.listByDateWithUsers(dateStr);
+
+        if (entries.length > 0) {
+          const ratingsCount = ratingRepo.countByDate(dateStr);
+          const stats = calculateRecapStats(entries, ratingsCount);
+
+          history.push({
+            date: dateStr,
+            participantCount: stats.participantCount,
+            avgRating: stats.avgRating,
+            ratingsGiven: stats.ratingsGiven,
+          });
+        }
+
+        dateObj.setDate(dateObj.getDate() - 1);
+        daysChecked++;
+      }
+
+      logger?.debug("Historique récupéré", { count: history.length });
+
+      return history;
+    },
   };
 }

@@ -44,6 +44,36 @@ async function getDayRecap(date = null) {
 }
 
 /**
+ * Récupère le récap de la semaine
+ */
+async function getWeekRecap(date = null) {
+  const dateParam = date || new Date().toISOString().split("T")[0];
+  return callApi(`/recap/week?date=${dateParam}`);
+}
+
+/**
+ * Récupère l'historique des récaps
+ */
+async function getRecapHistory(limit = 5) {
+  return callApi(`/recap/history?limit=${limit}`);
+}
+
+/**
+ * Récupère les stats d'un utilisateur
+ */
+async function getUserStats(username) {
+  return callApi(`/recap/stats/${encodeURIComponent(username)}`);
+}
+
+/**
+ * Récupère le leaderboard
+ */
+async function getLeaderboard(month = null) {
+  const monthParam = month ? `?month=${month}` : "";
+  return callApi(`/recap/leaderboard${monthParam}`);
+}
+
+/**
  * Récupère la liste des utilisateurs
  */
 async function getUsers() {
@@ -65,6 +95,10 @@ async function checkUser(username) {
 module.exports = {
   callApi,
   getDayRecap,
+  getWeekRecap,
+  getRecapHistory,
+  getUserStats,
+  getLeaderboard,
   getUsers,
   checkUser,
 };

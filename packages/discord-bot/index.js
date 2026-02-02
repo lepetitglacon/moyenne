@@ -28,6 +28,8 @@ const {
   createScheduleService,
   createUserService,
   createRecapService,
+  createEmbedBuilderService,
+  createReminderService,
 } = require("./application");
 
 // Commands & Handlers
@@ -53,6 +55,8 @@ async function main() {
   const logSchedule = new Logger("Schedule");
   const logUser = new Logger("User");
   const logRecap = new Logger("Recap");
+  const logEmbed = new Logger("Embed");
+  const logReminder = new Logger("Reminder");
   const logHandler = new Logger("Handler");
 
   // Initialize services
@@ -67,11 +71,24 @@ async function main() {
     logger: logUser,
   });
 
+  const embedBuilderService = createEmbedBuilderService({
+    userService,
+    logger: logEmbed,
+  });
+
   const recapService = createRecapService({
     scheduleService,
     userService,
+    embedBuilderService,
+    configRepo,
     apiClient,
     logger: logRecap,
+  });
+
+  const reminderService = createReminderService({
+    configRepo,
+    scheduleService,
+    logger: logReminder,
   });
 
   // Initialize handlers
@@ -79,6 +96,10 @@ async function main() {
     scheduleService,
     userService,
     recapService,
+    reminderService,
+    embedBuilderService,
+    configRepo,
+    apiClient,
     logger: logHandler,
   });
 
@@ -112,6 +133,9 @@ async function main() {
 
     // Start scheduler
     scheduleService.start(() => recapService.send(client));
+
+    // Start reminder service
+    reminderService.start(client);
   });
 
   // Event: Interaction (slash commands)

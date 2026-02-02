@@ -62,6 +62,16 @@ function createUserService({ userLinkRepo, apiClient, logger }) {
         links.map((l) => [l.tilt_username.toLowerCase(), l.discord_id])
       );
     },
+
+    /**
+     * Get linked Tilt username for a Discord user
+     * @param {string} discordId
+     * @returns {string|null} Tilt username or null if not linked
+     */
+    getLinkedUsername(discordId) {
+      const link = userLinkRepo.findByDiscordId(discordId);
+      return link?.tilt_username || null;
+    },
   };
 }
 

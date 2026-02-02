@@ -5,6 +5,81 @@
 const cron = require("node-cron");
 const { validateTimeFormat, timeToCron } = require("../domain-bridge/time");
 const { ValidationError, ConfigError } = require("../shared/errors");
+const { DAYS_OF_WEEK, ALL_DAYS } = require("../shared/constants");
+
+/**
+ * Convert FR day abbreviations to cron day numbers
+ * @param {string} daysStr - Comma-separated day abbreviations (e.g., "lun,mar,mer")
+ * @returns {string} Cron day numbers (e.g., "1,2,3")
+ */
+function daysToCronDays(daysStr) {
+  if (!daysStr || daysStr === ALL_DAYS) {
+    return "*";
+  }
+
+  const days = daysStr.split(",").map((d) => d.trim().toLowerCase());
+  const cronDays = days
+    .map((d) => DAYS_OF_WEEK[d]?.index)
+    .filter((d) => d !== undefined);
+
+  if (cronDays.length === 0) {
+    return "*";
+  }
+
+  // Check if all days are included
+  if (cronDays.length === 7) {
+    return "*";
+  }
+
+  return cronDays.join(",");
+}
+
+/**
+ * Convert time and days to full cron expression
+ * @param {string} time - Time in HH:MM format
+ * @param {string} daysStr - Comma-separated day abbreviations
+ * @returns {string} Full cron expression
+ */
+function timeToCronWithDays(time, daysStr) {
+  const [hours, minutes] = time.split(":");
+  const cronDays = daysToCronDays(daysStr);
+  return `${minutes} ${hours} * * ${cronDays}`;
+}
+
+/**
+ * Check if today is an active day
+ * @param {string} daysStr - Comma-separated day abbreviations
+ * @param {string} timezone - Timezone string
+ * @returns {boolean}
+ */
+function isTodayActive(daysStr, timezone = "Europe/Paris") {
+  if (!daysStr || daysStr === ALL_DAYS) {
+    return true;
+  }
+
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: timezone,
+  });
+  const dayName = formatter.format(now).toLowerCase();
+
+  // Map English day names to FR abbreviations
+  const dayMap = {
+    mon: "lun",
+    tue: "mar",
+    wed: "mer",
+    thu: "jeu",
+    fri: "ven",
+    sat: "sam",
+    sun: "dim",
+  };
+
+  const frDay = dayMap[dayName];
+  const activeDays = daysStr.split(",").map((d) => d.trim().toLowerCase());
+
+  return activeDays.includes(frDay);
+}
 
 /**
  * @param {{
@@ -25,6 +100,8 @@ function createScheduleService({ configRepo, logger }) {
         channelId: config?.channel_id || null,
         enabled: Boolean(config?.enabled),
         recapTime: config?.recap_time || "23:30",
+        daysOfWeek: config?.days_of_week || ALL_DAYS,
+        timezone: config?.timezone || "Europe/Paris",
       };
     },
 
@@ -82,14 +159,31 @@ function createScheduleService({ configRepo, logger }) {
       }
 
       const recapTime = config.recap_time || "23:30";
-      const cronExpression = timeToCron(recapTime);
+      const daysOfWeek = config.days_of_week || ALL_DAYS;
+      const timezone = config.timezone || "Europe/Paris";
+      const cronExpression = timeToCronWithDays(recapTime, daysOfWeek);
 
-      logger?.info(`Scheduler programmé pour ${recapTime}`, { cron: cronExpression });
-
-      scheduledTask = cron.schedule(cronExpression, () => {
-        logger?.info("Exécution du récap programmé");
-        onTick();
+      logger?.info(`Scheduler programmé pour ${recapTime}`, {
+        cron: cronExpression,
+        days: daysOfWeek,
+        timezone,
       });
+
+      scheduledTask = cron.schedule(
+        cronExpression,
+        () => {
+          // Double-check if today is active (handles timezone edge cases)
+          if (isTodayActive(daysOfWeek, timezone)) {
+            logger?.info("Exécution du récap programmé");
+            onTick();
+          } else {
+            logger?.info("Jour non actif, récap ignoré");
+          }
+        },
+        {
+          timezone,
+        }
+      );
     },
 
     /**
@@ -117,7 +211,18 @@ function createScheduleService({ configRepo, logger }) {
       }
       return config;
     },
+
+    /**
+     * Check if today is an active day for recaps
+     * @returns {boolean}
+     */
+    isTodayActive() {
+      const config = configRepo.get();
+      const daysOfWeek = config?.days_of_week || ALL_DAYS;
+      const timezone = config?.timezone || "Europe/Paris";
+      return isTodayActive(daysOfWeek, timezone);
+    },
   };
 }
 
-module.exports = { createScheduleService };
+module.exports = { createScheduleService, daysToCronDays, isTodayActive };
