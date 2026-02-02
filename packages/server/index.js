@@ -23,6 +23,7 @@ import {
   createUserRepository,
   createEntryRepository,
   createRatingRepository,
+  createAssignmentRepository,
 } from "./infrastructure/index.js";
 
 // Application
@@ -52,6 +53,7 @@ export const __dirname = path.dirname(__filename);
 const userRepo = createUserRepository(pool);
 const entryRepo = createEntryRepository(pool);
 const ratingRepo = createRatingRepository(pool);
+const assignmentRepo = createAssignmentRepository(pool);
 
 // Initialize loggers
 const logAuth = new Logger("Auth");
@@ -60,7 +62,7 @@ const logBot = new Logger("Bot");
 
 // Initialize services
 const authService = createAuthService({ userRepo, config, logger: logAuth });
-const entryService = createEntryService({ entryRepo, ratingRepo, logger: logAPI });
+const entryService = createEntryService({ entryRepo, ratingRepo, assignmentRepo, logger: logAPI });
 const statsService = createStatsService({ userRepo, entryRepo, ratingRepo, logger: logBot });
 
 // Initialize middlewares

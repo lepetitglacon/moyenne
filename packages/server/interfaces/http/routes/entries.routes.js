@@ -25,7 +25,7 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
     }
   });
 
-  // Get next review
+  // Get next review (anonymous - no username returned)
   router.get("/review/next", authenticateToken, async (req, res, next) => {
     try {
       const result = await entryService.getNextReview({ userId: req.user.id });
@@ -34,12 +34,13 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
         return res.json({ done: true });
       }
 
+      // Return entry WITHOUT username for anonymity (guessing game)
       res.json({
         userId: result.userId,
-        username: result.username,
         date: result.date,
         rating: result.rating,
         description: result.description,
+        // NOTE: username intentionally NOT included - it's a guessing game!
       });
     } catch (err) {
       next(err);

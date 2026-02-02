@@ -99,6 +99,19 @@ async function initDb() {
       )
     `);
 
+    // Review assignments (1 reviewer → 1 reviewee per day, exclusive)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS review_assignments (
+        id SERIAL PRIMARY KEY,
+        reviewer_id INTEGER NOT NULL REFERENCES users(id),
+        reviewee_id INTEGER NOT NULL REFERENCES users(id),
+        date DATE NOT NULL,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(reviewer_id, date),
+        UNIQUE(reviewee_id, date)
+      )
+    `);
+
     // Ratings
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ratings (
