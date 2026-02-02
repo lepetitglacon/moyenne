@@ -3,12 +3,25 @@ const { Pool } = pkg;
 import bcrypt from "bcryptjs";
 
 // Create PostgreSQL connection pool
-const pool = new Pool({
+// Supports both connection string (DATABASE_URL) and individual variables
+// Individual variables take precedence to avoid URL encoding issues with special characters
+const poolConfig = process.env.POSTGRES_HOST ? {
+  host: process.env.POSTGRES_HOST,
+  port: process.env.POSTGRES_PORT || 5432,
+  database: process.env.POSTGRES_DB || 'moyenne',
+  user: process.env.POSTGRES_USER || 'moyenne',
+  password: process.env.POSTGRES_PASSWORD,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+} : {
   connectionString: process.env.DATABASE_URL || 'postgresql://moyenne:moyenne_password@localhost:5432/moyenne',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
-});
+};
+
+const pool = new Pool(poolConfig);
 
 // Export pool as db for compatibility
 export const db = {
