@@ -12,7 +12,9 @@ const { authFetch, token } = useAuth();
 function getCurrentUserId(): number | null {
   if (!token.value) return null;
   try {
-    const payload = JSON.parse(atob(token.value.split('.')[1]));
+    const parts = token.value.split('.');
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(atob(parts[1]));
     return payload.id ?? payload.userId ?? null;
   } catch {
     return null;
@@ -511,13 +513,6 @@ const globalLinePoints = computed(() => {
     const y = chartHeight - chartPadding - (m.avgRating / 20) * (chartHeight - chartPadding * 2);
     return `${x},${y}`;
   }).join(" ");
-});
-
-const monthLabelsChart = computed(() => {
-  if (!graphs.value?.userMonthly.length) return [];
-  const months = graphs.value.userMonthly;
-  const xStep = (chartWidth - chartPadding * 2) / Math.max(months.length - 1, 1);
-  return months.map((m, i) => ({ x: chartPadding + i * xStep, label: m.month.slice(5) }));
 });
 
 // Day of week
