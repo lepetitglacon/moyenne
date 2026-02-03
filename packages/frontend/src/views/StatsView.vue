@@ -4,6 +4,32 @@ import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import NavMenu from "../components/NavMenu.vue";
 import { useAuth } from "../composables/useAuth";
+import { Line, Bar } from "vue-chartjs";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 const router = useRouter();
 const { authFetch, token } = useAuth();
@@ -489,41 +515,187 @@ const heatmapWeeks = computed(() => {
   return weeks;
 });
 
-// Line chart
-const chartWidth = 500;
-const chartHeight = 160;
-const chartPadding = 30;
+// Chart.js options
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'bottom' as const,
+      labels: {
+        color: 'rgba(255,255,255,0.7)',
+        font: { size: 11 },
+        boxWidth: 12,
+        padding: 15,
+      },
+    },
+    tooltip: {
+      backgroundColor: 'rgba(30,35,60,0.95)',
+      titleColor: '#fff',
+      bodyColor: 'rgba(255,255,255,0.8)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      padding: 10,
+      cornerRadius: 8,
+    },
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
+    },
+    y: {
+      min: 0,
+      max: 20,
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, stepSize: 5 },
+    },
+  },
+};
 
-const lineChartPoints = computed(() => {
-  if (!graphs.value?.userMonthly.length) return "";
-  const months = graphs.value.userMonthly;
-  const xStep = (chartWidth - chartPadding * 2) / Math.max(months.length - 1, 1);
-  return months.map((m, i) => {
-    const x = chartPadding + i * xStep;
-    const y = chartHeight - chartPadding - (m.avgRating / 20) * (chartHeight - chartPadding * 2);
-    return `${x},${y}`;
-  }).join(" ");
-});
+const barChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(30,35,60,0.95)',
+      titleColor: '#fff',
+      bodyColor: 'rgba(255,255,255,0.8)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      padding: 10,
+      cornerRadius: 8,
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } },
+    },
+    y: {
+      min: 0,
+      max: 20,
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, stepSize: 5 },
+    },
+  },
+};
 
-const globalLinePoints = computed(() => {
-  if (!graphs.value?.globalMonthly.length) return "";
-  const months = graphs.value.globalMonthly;
-  const xStep = (chartWidth - chartPadding * 2) / Math.max(months.length - 1, 1);
-  return months.map((m, i) => {
-    const x = chartPadding + i * xStep;
-    const y = chartHeight - chartPadding - (m.avgRating / 20) * (chartHeight - chartPadding * 2);
-    return `${x},${y}`;
-  }).join(" ");
-});
+// Evolution chart data
+const evolutionChartData = computed(() => {
+  const userMonthly = graphs.value?.userMonthly || [];
+  const globalMonthly = graphs.value?.globalMonthly || [];
 
-// Day of week
-const dayLabels = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-const dayOfWeekData = computed(() => {
-  if (!graphs.value?.byDayOfWeek.length) return [];
-  return Array(7).fill(null).map((_, i) => {
-    const found = graphs.value!.byDayOfWeek.find((d) => d.dayOfWeek === i);
-    return { dayOfWeek: i, avgRating: found?.avgRating ?? 0, entryCount: found?.entryCount ?? 0 };
+  // Use user months as labels, fallback to global if empty
+  const months = userMonthly.length ? userMonthly : globalMonthly;
+  const labels = months.map(m => {
+    const parts = m.month.split('-');
+    const month = parts[1] || '01';
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return monthNames[parseInt(month) - 1] || month;
   });
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Moi',
+        data: userMonthly.map(m => m.avgRating),
+        borderColor: 'rgba(255,180,100,0.9)',
+        backgroundColor: 'rgba(255,180,100,0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgba(255,180,100,1)',
+      },
+      {
+        label: 'Global',
+        data: globalMonthly.map(m => m.avgRating),
+        borderColor: 'rgba(255,255,255,0.3)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        tension: 0.3,
+        fill: false,
+        pointRadius: 2,
+        pointBackgroundColor: 'rgba(255,255,255,0.5)',
+      },
+    ],
+  };
+});
+
+// Global-only chart data
+const globalChartData = computed(() => {
+  const globalMonthly = graphs.value?.globalMonthly || [];
+
+  const labels = globalMonthly.map(m => {
+    const parts = m.month.split('-');
+    const month = parts[1] || '01';
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return monthNames[parseInt(month) - 1] || month;
+  });
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Moyenne globale',
+        data: globalMonthly.map(m => m.avgRating),
+        borderColor: 'rgba(100,200,255,0.9)',
+        backgroundColor: 'rgba(100,200,255,0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgba(100,200,255,1)',
+      },
+    ],
+  };
+});
+
+// Day of week bar chart data
+const dowChartData = computed(() => {
+  const data = graphs.value?.byDayOfWeek || [];
+  const dayLabelsShort = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+  // Create array with all days, filling missing with 0
+  const values = dayLabelsShort.map((_, i) => {
+    const found = data.find(d => d.dayOfWeek === i);
+    return found?.avgRating ?? 0;
+  });
+
+  // Generate colors based on rating
+  const colors = values.map(v => {
+    if (v === 0) return 'rgba(255,255,255,0.1)';
+    const t = v / 20;
+    const r = Math.round(220 * (1 - t) + 40 * t);
+    const g = Math.round(60 * (1 - t) + 200 * t);
+    const b = Math.round(70 * (1 - t) + 90 * t);
+    return `rgba(${r}, ${g}, ${b}, 0.8)`;
+  });
+
+  return {
+    labels: dayLabelsShort,
+    datasets: [
+      {
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+    ],
+  };
+});
+
+const hasEvolutionData = computed(() => {
+  return (graphs.value?.userMonthly?.length ?? 0) > 0 || (graphs.value?.globalMonthly?.length ?? 0) > 0;
+});
+
+const hasDowData = computed(() => {
+  return (graphs.value?.byDayOfWeek?.length ?? 0) > 0;
 });
 
 // Leaderboard helpers
@@ -667,38 +839,17 @@ function getBadgeName(key: string): string {
             <div class="dashboard-col">
               <div class="graph-box">
                 <div class="graph-title">Evolution 12 mois</div>
-                <template v-if="lineChartPoints || globalLinePoints">
-                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                    <line v-for="i in 5" :key="'grid-' + i"
-                      :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                      :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                      class="grid-line" />
-                    <text v-for="i in 5" :key="'y-' + i" :x="chartPadding - 6"
-                      :y="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4 + 3"
-                      class="axis-label" text-anchor="end">{{ 20 - (i - 1) * 5 }}</text>
-                    <polyline v-if="globalLinePoints" :points="globalLinePoints" class="global-line" fill="none" />
-                    <polyline v-if="lineChartPoints" :points="lineChartPoints" class="user-line" fill="none" />
-                  </svg>
-                  <div class="chart-legend">
-                    <span class="legend-item"><span class="legend-dot legend-dot--user"></span>Moi</span>
-                    <span class="legend-item"><span class="legend-dot legend-dot--global"></span>Global</span>
-                  </div>
-                </template>
+                <div v-if="hasEvolutionData" class="chart-container">
+                  <Line :data="evolutionChartData" :options="chartOptions" />
+                </div>
                 <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
               <div class="graph-box">
                 <div class="graph-title">Moyenne par jour</div>
-                <template v-if="dayOfWeekData.length && dayOfWeekData.some(d => d.avgRating > 0)">
-                  <div class="dow-chart">
-                    <div v-for="d in dayOfWeekData" :key="'dow-' + d.dayOfWeek" class="dow-item">
-                      <div class="dow-bar-container">
-                        <div class="dow-bar" :style="{ height: `${(d.avgRating / 20) * 100}%`, background: ratingToColor(d.avgRating) }"></div>
-                      </div>
-                      <span class="dow-label">{{ dayLabels[d.dayOfWeek] }}</span>
-                    </div>
-                  </div>
-                </template>
+                <div v-if="hasDowData" class="chart-container chart-container--bar">
+                  <Bar :data="dowChartData" :options="barChartOptions" />
+                </div>
                 <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
@@ -835,15 +986,9 @@ function getBadgeName(key: string): string {
             <div class="global-col">
               <div class="graph-box">
                 <div class="graph-title">Evolution 12 mois</div>
-                <template v-if="graphs?.globalMonthly?.length && globalLinePoints">
-                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                    <line v-for="i in 5" :key="'grid-' + i"
-                      :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                      :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                      class="grid-line" />
-                    <polyline :points="globalLinePoints" class="global-line-main" fill="none" />
-                  </svg>
-                </template>
+                <div v-if="graphs?.globalMonthly?.length" class="chart-container">
+                  <Line :data="globalChartData" :options="chartOptions" />
+                </div>
                 <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
@@ -1054,6 +1199,15 @@ function getBadgeName(key: string): string {
   padding: 30px 10px;
   opacity: .5;
   font-size: 13px;
+}
+
+.chart-container {
+  height: 180px;
+  position: relative;
+}
+
+.chart-container--bar {
+  height: 140px;
 }
 
 .line-chart { width: 100%; height: auto; }

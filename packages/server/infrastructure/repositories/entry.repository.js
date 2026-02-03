@@ -520,7 +520,7 @@ export function createEntryRepository(pool) {
          WHERE jsonb_array_length(COALESCE(e.tags, '[]'::jsonb)) > 0
          ${userFilter}
          GROUP BY tag
-         HAVING COUNT(*) >= 3
+         HAVING COUNT(*) >= 1
          ORDER BY AVG(e.rating) DESC`,
         params
       );

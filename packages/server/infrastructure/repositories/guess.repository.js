@@ -105,7 +105,7 @@ export function createGuessRepository(pool) {
          FROM guesses g
          JOIN users u ON u.id = g.guesser_id
          GROUP BY g.guesser_id, u.username
-         HAVING COUNT(*) >= 5
+         HAVING COUNT(*) >= 1
          ORDER BY accuracy DESC, correct_guesses DESC
          LIMIT $1`,
         [limit]
