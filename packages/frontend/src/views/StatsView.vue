@@ -13,8 +13,9 @@ function getCurrentUserId(): number | null {
   if (!token.value) return null;
   try {
     const parts = token.value.split('.');
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(atob(parts[1]));
+    const payloadPart = parts[1];
+    if (!payloadPart) return null;
+    const payload = JSON.parse(atob(payloadPart));
     return payload.id ?? payload.userId ?? null;
   } catch {
     return null;
