@@ -1043,6 +1043,13 @@ function getBadgeName(key: string): string {
 </template>
 
 <style scoped>
+/* Base box-sizing for all elements */
+.stats-page *,
+.stats-page *::before,
+.stats-page *::after {
+  box-sizing: border-box;
+}
+
 /* Scrollable layout */
 .stats-page {
   width: 100%;
@@ -1168,6 +1175,7 @@ function getBadgeName(key: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0; /* Prevent grid blowout */
 }
 
 /* Graph boxes */
@@ -1652,6 +1660,7 @@ function getBadgeName(key: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0; /* Prevent grid blowout */
 }
 
 /* Leaderboard styles */
@@ -1743,6 +1752,35 @@ function getBadgeName(key: string): string {
   .stats-page {
     padding: 12px 12px 100px 12px; /* Extra bottom padding for nav */
     gap: 12px;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .stats-content {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .dashboard-grid {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .dashboard-col {
+    max-width: 100%;
+    min-width: 0; /* Critical for flex/grid children */
+    overflow: hidden;
+  }
+
+  .global-grid {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .global-col {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
   }
 
   /* Header mobile */
@@ -1813,6 +1851,8 @@ function getBadgeName(key: string): string {
   .calendar-section {
     padding: 14px 12px;
     border-radius: 10px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .calendar-head {
@@ -1823,6 +1863,7 @@ function getBadgeName(key: string): string {
     width: 40px;
     height: 40px;
     font-size: 16px;
+    flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -1831,22 +1872,24 @@ function getBadgeName(key: string): string {
   }
 
   .calendar-weekdays {
-    gap: 3px;
+    gap: 2px;
     font-size: 10px;
     margin-bottom: 4px;
   }
 
   .calendar-grid {
-    gap: 3px;
+    gap: 2px;
   }
 
   .cal-day {
-    min-height: 36px;
-    border-radius: 5px;
+    min-height: 0;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    padding: 1px;
   }
 
   .day-num {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   /* Tooltip mobile - position at bottom of screen */
@@ -1866,8 +1909,16 @@ function getBadgeName(key: string): string {
 
   /* Charts mobile */
   .graph-box {
-    padding: 14px 12px;
+    padding: 14px 10px;
     border-radius: 10px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .graph-header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .graph-title {
@@ -1877,6 +1928,7 @@ function getBadgeName(key: string): string {
 
   .chart-container {
     height: 160px;
+    max-width: 100%;
   }
 
   .chart-container--bar {
@@ -1892,24 +1944,26 @@ function getBadgeName(key: string): string {
   .heatmap-box {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    max-width: 100%;
   }
 
   .heatmap-grid {
-    min-width: 500px;
+    min-width: 450px;
     gap: 1px;
   }
 
   .heatmap-day {
-    min-width: 8px;
+    min-width: 6px;
     border-radius: 1px;
   }
 
   .year-nav { gap: 6px; }
 
   .nav-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -1917,6 +1971,8 @@ function getBadgeName(key: string): string {
   .badges-section {
     padding: 14px 12px;
     border-radius: 10px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .section-title {
@@ -1932,6 +1988,7 @@ function getBadgeName(key: string): string {
   .badge-item {
     padding: 6px 10px;
     border-radius: 16px;
+    max-width: 100%;
   }
 
   .badge-icon { font-size: 14px; }
@@ -1956,12 +2013,17 @@ function getBadgeName(key: string): string {
     font-size: 14px;
     border-radius: 10px;
     margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   /* Tags mobile */
   .tags-section, .category-section {
     padding: 14px 12px;
     border-radius: 10px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .tags-grid {
@@ -2045,6 +2107,8 @@ function getBadgeName(key: string): string {
   .lb-section {
     padding: 14px 12px;
     border-radius: 10px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .lb-title {
@@ -2056,18 +2120,28 @@ function getBadgeName(key: string): string {
 
   .lb-row {
     padding: 10px 12px;
-    gap: 10px;
+    gap: 8px;
     border-radius: 8px;
   }
 
   .rank {
-    width: 26px;
-    height: 26px;
-    font-size: 11px;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    flex-shrink: 0;
   }
 
-  .lb-user { font-size: 13px; }
-  .lb-score { font-size: 13px; }
+  .lb-user {
+    font-size: 13px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lb-score {
+    font-size: 13px;
+    flex-shrink: 0;
+  }
 
   .lb-empty {
     padding: 16px 10px;
@@ -2076,10 +2150,11 @@ function getBadgeName(key: string): string {
 
   .lb-tags {
     gap: 3px;
-    margin-right: 6px;
+    margin-right: 4px;
+    flex-shrink: 0;
   }
 
-  .mini-tag { font-size: 14px; }
+  .mini-tag { font-size: 12px; }
 }
 
 /* Extra small phones */
