@@ -33,5 +33,16 @@ export function createAuthRoutes({ authService }) {
     }
   });
 
+  // Refresh token
+  router.post("/refresh", async (req, res, next) => {
+    try {
+      const { refreshToken } = req.body;
+      const result = await authService.refreshToken({ refreshToken });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

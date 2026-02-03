@@ -44,7 +44,7 @@ async function onLogin() {
       throw new Error("Token manquant.");
     }
 
-    loginWithToken(data.token);
+    loginWithToken(data.token, data.refreshToken);
     await router.push({ name: "note" });
   } catch (e: any) {
     error.value = e?.message ?? "Connexion impossible.";

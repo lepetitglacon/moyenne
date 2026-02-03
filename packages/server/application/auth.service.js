@@ -17,7 +17,8 @@ import { ValidationError, AuthError, ConflictError } from "../shared/errors.js";
 
 /**
  * @typedef {Object} LoginResult
- * @property {string} token
+ * @property {string} token - Access token (short-lived)
+ * @property {string} refreshToken - Refresh token (long-lived)
  * @property {{ id: number, username: string }} user
  */
 
@@ -92,22 +93,83 @@ export function createAuthService({ userRepo, config, logger }) {
         throw new AuthError("Invalid credentials");
       }
 
-      // Generate token
+      // Generate access token (short-lived)
       const token = jwt.sign(
         { id: user.id, username: user.username },
         config.secretKey,
         { expiresIn: "2h" }
       );
 
+      // Generate refresh token (long-lived)
+      const refreshToken = jwt.sign(
+        { id: user.id, username: user.username, type: "refresh" },
+        config.secretKey,
+        { expiresIn: "30d" }
+      );
+
       logger?.info("Connexion réussie", { username });
 
       return {
         token,
+        refreshToken,
         user: {
           id: user.id,
           username: user.username,
         },
       };
+    },
+
+    /**
+     * Refresh access token using a valid refresh token
+     * @param {{ refreshToken: string }} params
+     * @returns {Promise<{ token: string, refreshToken: string }>}
+     * @throws {AuthError} If refresh token is invalid or expired
+     */
+    async refreshToken({ refreshToken }) {
+      if (!refreshToken) {
+        throw new AuthError("Refresh token required");
+      }
+
+      try {
+        // Verify refresh token
+        const decoded = jwt.verify(refreshToken, config.secretKey);
+
+        // Check it's a refresh token
+        if (decoded.type !== "refresh") {
+          throw new AuthError("Invalid token type");
+        }
+
+        // Verify user still exists
+        const user = await userRepo.findById(decoded.id);
+        if (!user) {
+          throw new AuthError("User not found");
+        }
+
+        // Generate new access token
+        const newToken = jwt.sign(
+          { id: user.id, username: user.username },
+          config.secretKey,
+          { expiresIn: "2h" }
+        );
+
+        // Generate new refresh token (rotate for security)
+        const newRefreshToken = jwt.sign(
+          { id: user.id, username: user.username, type: "refresh" },
+          config.secretKey,
+          { expiresIn: "30d" }
+        );
+
+        logger?.debug("Token rafraîchi", { userId: user.id });
+
+        return {
+          token: newToken,
+          refreshToken: newRefreshToken,
+        };
+      } catch (err) {
+        if (err instanceof AuthError) throw err;
+        logger?.debug("Refresh token invalide", { error: err.message });
+        throw new AuthError("Invalid or expired refresh token");
+      }
     },
   };
 }
