@@ -397,13 +397,119 @@ function getMedalClass(index: number): string {
   margin-left: 2px;
 }
 
-@media (max-width: 480px) {
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .leaderboard-page {
+    width: 100%;
+    max-height: none;
+    padding-bottom: 20px;
+  }
+
+  .lb-header {
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .lb-logo {
+    width: 40px;
+  }
+
+  .lb-title {
+    font-size: 20px;
+  }
+
   .tabs {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
   }
 
   .tab {
+    flex: 1;
     min-width: 0;
+    padding: 12px 10px;
+    font-size: 11px;
+    border-radius: 8px;
+  }
+
+  .month-nav {
+    gap: 10px;
+  }
+
+  .nav-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .month-label {
+    font-size: 14px;
+    min-width: 120px;
+  }
+
+  .list-container {
+    gap: 6px;
+  }
+
+  .lb-row {
+    padding: 12px 12px;
+    gap: 10px;
+    border-radius: 10px;
+  }
+
+  .rank {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .username {
+    font-size: 14px;
+  }
+
+  .meta {
+    font-size: 10px;
+  }
+
+  .score-value {
+    font-size: 18px;
+  }
+
+  .score-unit {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .tab {
+    padding: 10px 6px;
+    font-size: 10px;
+  }
+
+  .username {
+    font-size: 13px;
+  }
+
+  .score-value {
+    font-size: 16px;
+  }
+}
+
+/* Touch feedback */
+@media (hover: none) and (pointer: coarse) {
+  .tab:hover,
+  .nav-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .tab:active,
+  .nav-btn:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+
+  .lb-row:active {
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 </style>

@@ -308,10 +308,71 @@ function getCategoryColor(catId: string): string {
   font-weight: 500;
 }
 
-/* Compact mode for mobile */
-@media (max-width: 480px) {
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .tag-selector {
+    max-width: 100%;
+  }
+
+  .tag-header {
+    margin-bottom: 10px;
+  }
+
+  .tag-title {
+    font-size: 13px;
+  }
+
+  .categories {
+    gap: 10px;
+  }
+
+  .category {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .category-header {
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+  }
+
+  .category-name {
+    font-size: 11px;
+  }
+
+  .tag-groups {
+    gap: 6px;
+  }
+
+  .tag-group {
+    gap: 6px;
+  }
+
+  .tag-group-label {
+    font-size: 11px;
+    width: 18px;
+    padding-top: 5px;
+  }
+
+  .tags {
+    gap: 5px;
+  }
+
   .tag {
-    padding: 4px 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tag-icon {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .tag {
+    padding: 5px 8px;
     font-size: 10px;
   }
 
@@ -321,6 +382,24 @@ function getCategoryColor(catId: string): string {
 
   .category {
     padding: 8px;
+  }
+}
+
+/* Touch feedback */
+@media (hover: none) and (pointer: coarse) {
+  .tag:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .tag:active {
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+
+  .tag--positive.tag--selected:active,
+  .tag--negative.tag--selected:active {
+    transform: scale(0.95);
   }
 }
 </style>

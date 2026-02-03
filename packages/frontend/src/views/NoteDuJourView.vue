@@ -445,4 +445,66 @@ function toggleTagSection() {
   font-weight: 700;
   color: #fff;
 }
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .tags-toggle {
+    max-width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .tags-section {
+    max-width: 100%;
+  }
+
+  .selected-tags-preview {
+    max-width: 100%;
+    gap: 5px;
+  }
+
+  .preview-tag {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
+  .preview-tag-icon {
+    font-size: 11px;
+  }
+
+  .badge-celebration {
+    padding: 24px 16px;
+  }
+
+  .celebration-title {
+    font-size: 20px;
+  }
+
+  .badge-celebration .badge-item {
+    padding: 14px 20px;
+  }
+
+  .badge-celebration .badge-icon {
+    font-size: 32px;
+  }
+
+  .badge-celebration .badge-name {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .preview-tag {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+
+  .badge-celebration .badge-icon {
+    font-size: 28px;
+  }
+
+  .badge-celebration .badge-name {
+    font-size: 14px;
+  }
+}
 </style>

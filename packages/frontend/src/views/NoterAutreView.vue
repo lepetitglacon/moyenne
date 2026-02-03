@@ -590,4 +590,141 @@ function reload() {
   font-size: 1rem;
   font-weight: 600;
 }
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .game-title {
+    font-size: 1.2rem;
+    padding: 0 12px;
+  }
+
+  .comment-card {
+    max-width: 100%;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+
+  .comment-text {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .comment-tags {
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .tag-chip {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+  }
+
+  .guess-grid {
+    max-width: 100%;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .guess-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .guess-label {
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+  }
+
+  .select-input {
+    padding: 14px 14px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  .rating-value {
+    font-size: 1.5rem;
+  }
+
+  /* Result screen */
+  .result-container {
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  .result-header {
+    font-size: 1.3rem;
+  }
+
+  .result-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .result-card-icon {
+    font-size: 1.6rem;
+  }
+
+  .result-card-text {
+    font-size: 0.9rem;
+  }
+
+  .score-summary {
+    padding: 10px 16px;
+    border-radius: 10px;
+  }
+
+  .score-item {
+    font-size: 1rem;
+    gap: 6px;
+  }
+
+  .score-icon {
+    font-size: 1.3rem;
+  }
+
+  .streak-badge {
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+  }
+
+  .streak-icon {
+    font-size: 1.3rem;
+  }
+
+  .guess-stats {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .new-badges {
+    padding: 14px 16px;
+    border-radius: 10px;
+  }
+
+  .badge-item {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .comment-text {
+    font-size: 0.95rem;
+  }
+
+  .rating-value {
+    font-size: 1.3rem;
+  }
+
+  .result-card-icon {
+    font-size: 1.4rem;
+  }
+
+  .score-item {
+    font-size: 0.9rem;
+  }
+}
 </style>

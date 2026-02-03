@@ -1711,6 +1711,8 @@ function getBadgeName(key: string): string {
 .mini-tag { font-size: 16px; }
 
 /* ==================== RESPONSIVE ==================== */
+
+/* Tablet landscape */
 @media (max-width: 1200px) {
   .dashboard-grid { grid-template-columns: 1fr 1fr; }
   .dashboard-col:nth-child(3) { display: none; }
@@ -1718,26 +1720,443 @@ function getBadgeName(key: string): string {
   .global-col:nth-child(3) { display: none; }
 }
 
+/* Tablet portrait */
 @media (max-width: 900px) {
+  .stats-page { padding: 16px; gap: 16px; }
+
   .dashboard-grid { grid-template-columns: 1fr; }
+  .dashboard-grid.two-columns { grid-template-columns: 1fr; }
   .dashboard-col:nth-child(3) { display: flex; }
-  .stats-cards { grid-template-columns: repeat(2, 1fr); }
+
+  .stats-cards { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
   .global-grid { grid-template-columns: 1fr; }
   .global-col:nth-child(3) { display: flex; }
-  .global-top-row { flex-direction: column; align-items: stretch; }
+  .global-top-row { flex-direction: column; align-items: stretch; gap: 12px; }
   .global-summary { flex-direction: row; }
-  .tags-grid { grid-template-columns: 1fr; }
+
+  .tags-grid { grid-template-columns: 1fr; gap: 12px; }
 }
 
+/* Mobile - Main breakpoint */
 @media (max-width: 600px) {
-  .stats-page { padding: 16px; gap: 16px; }
-  .stats-header { flex-wrap: wrap; }
-  .header-left { width: 100%; margin-bottom: 8px; }
-  .profile-switch { margin-left: 0; }
-  .tabs { width: 100%; }
-  .tab { flex: 1; text-align: center; }
-  .stats-cards { grid-template-columns: repeat(2, 1fr); }
-  .card { padding: 14px 10px; }
-  .card-value { font-size: 22px; }
+  .stats-page {
+    padding: 12px 12px 100px 12px; /* Extra bottom padding for nav */
+    gap: 12px;
+  }
+
+  /* Header mobile */
+  .stats-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .header-left {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-logo { width: 32px; }
+  .stats-title { font-size: 18px; }
+
+  .tabs {
+    width: 100%;
+    order: 2;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+
+  .profile-switch {
+    margin-left: 0;
+    order: 3;
+    width: 100%;
+  }
+
+  .profile-select {
+    width: 100%;
+    height: 44px;
+    font-size: 15px;
+    padding: 0 36px 0 16px;
+  }
+
+  /* Stats cards mobile - 2x2 grid */
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .card {
+    padding: 14px 10px;
+    border-radius: 10px;
+  }
+
+  .card-label {
+    font-size: 10px;
+    margin-bottom: 6px;
+  }
+
+  .card-value {
+    font-size: 22px;
+  }
+
+  .card-value small {
+    font-size: 12px;
+  }
+
+  /* Calendar mobile */
+  .calendar-section {
+    padding: 14px 12px;
+    border-radius: 10px;
+  }
+
+  .calendar-head {
+    margin-bottom: 10px;
+  }
+
+  .cal-nav {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cal-month {
+    font-size: 14px;
+  }
+
+  .calendar-weekdays {
+    gap: 3px;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+  }
+
+  .cal-day {
+    min-height: 36px;
+    border-radius: 5px;
+  }
+
+  .day-num {
+    font-size: 11px;
+  }
+
+  /* Tooltip mobile - position at bottom of screen */
+  .cal-tooltip {
+    position: fixed;
+    bottom: 80px;
+    left: 12px;
+    right: 12px;
+    top: auto;
+    transform: none;
+    max-width: none;
+    min-width: auto;
+    z-index: 1000;
+  }
+
+  .cal-tooltip::after { display: none; }
+
+  /* Charts mobile */
+  .graph-box {
+    padding: 14px 12px;
+    border-radius: 10px;
+  }
+
+  .graph-title {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .chart-container {
+    height: 160px;
+  }
+
+  .chart-container--bar {
+    height: 120px;
+  }
+
+  .graph-empty {
+    padding: 24px 10px;
+    font-size: 12px;
+  }
+
+  /* Heatmap mobile - horizontal scroll */
+  .heatmap-box {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .heatmap-grid {
+    min-width: 500px;
+    gap: 1px;
+  }
+
+  .heatmap-day {
+    min-width: 8px;
+    border-radius: 1px;
+  }
+
+  .year-nav { gap: 6px; }
+
+  .nav-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Badges mobile */
+  .badges-section {
+    padding: 14px 12px;
+    border-radius: 10px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .badges-earned {
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .badge-item {
+    padding: 6px 10px;
+    border-radius: 16px;
+  }
+
+  .badge-icon { font-size: 14px; }
+  .badge-name { font-size: 11px; }
+
+  .badges-empty {
+    padding: 12px;
+    font-size: 12px;
+  }
+
+  .progress-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+
+  .progress-name { font-size: 11px; }
+  .progress-value { font-size: 10px; }
+  .progress-bar { height: 5px; }
+
+  .edit-btn {
+    padding: 14px 16px;
+    font-size: 14px;
+    border-radius: 10px;
+    margin-top: 10px;
+  }
+
+  /* Tags mobile */
+  .tags-section, .category-section {
+    padding: 14px 12px;
+    border-radius: 10px;
+  }
+
+  .tags-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .tags-column-title {
+    font-size: 11px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tag-impact-list { gap: 5px; }
+
+  .tag-impact-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+
+  .tag-icon { font-size: 13px; }
+  .tag-name { font-size: 12px; }
+  .tag-impact-value { font-size: 12px; }
+
+  .tags-empty {
+    padding: 16px 10px;
+    font-size: 12px;
+  }
+
+  /* Category table mobile */
+  .category-table { gap: 6px; }
+
+  .category-row {
+    padding: 8px 10px;
+    gap: 10px;
+    border-radius: 6px;
+  }
+
+  .category-info {
+    min-width: 70px;
+    gap: 6px;
+  }
+
+  .category-icon { font-size: 14px; }
+  .category-name { font-size: 12px; }
+  .category-bar-container { height: 6px; }
+  .category-impact {
+    font-size: 12px;
+    min-width: 40px;
+  }
+
+  /* Global tab mobile */
+  .global-top-row {
+    gap: 10px;
+  }
+
+  .month-nav-inline {
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .month-label-inline {
+    font-size: 14px;
+    min-width: 120px;
+  }
+
+  .global-summary {
+    gap: 8px;
+  }
+
+  .summary-card {
+    padding: 12px 8px;
+    border-radius: 10px;
+  }
+
+  .summary-label { font-size: 9px; }
+  .summary-value { font-size: 18px; }
+  .summary-value small { font-size: 10px; }
+
+  /* Leaderboards mobile */
+  .lb-section {
+    padding: 14px 12px;
+    border-radius: 10px;
+  }
+
+  .lb-title {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .lb-list { gap: 6px; }
+
+  .lb-row {
+    padding: 10px 12px;
+    gap: 10px;
+    border-radius: 8px;
+  }
+
+  .rank {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .lb-user { font-size: 13px; }
+  .lb-score { font-size: 13px; }
+
+  .lb-empty {
+    padding: 16px 10px;
+    font-size: 12px;
+  }
+
+  .lb-tags {
+    gap: 3px;
+    margin-right: 6px;
+  }
+
+  .mini-tag { font-size: 14px; }
+}
+
+/* Extra small phones */
+@media (max-width: 360px) {
+  .stats-page {
+    padding: 10px 10px 100px 10px;
+  }
+
+  .stats-title { font-size: 16px; }
+
+  .card-value { font-size: 20px; }
+  .card-label { font-size: 9px; }
+
+  .cal-day { min-height: 32px; }
+  .day-num { font-size: 10px; }
+
+  .chart-container { height: 140px; }
+
+  .summary-value { font-size: 16px; }
+
+  .lb-user { font-size: 12px; }
+  .lb-score { font-size: 12px; }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+  .tab:hover,
+  .cal-nav:hover,
+  .nav-btn:hover,
+  .lb-row:hover,
+  .cal-day:hover {
+    /* Remove hover effects on touch devices */
+    background: inherit;
+    opacity: inherit;
+  }
+
+  .tab:active,
+  .cal-nav:active,
+  .nav-btn:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+
+  .lb-row:active {
+    background: rgba(255,255,255,.12);
+  }
+
+  .cal-day:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Safe area for notched phones */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .stats-page {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 900px) and (orientation: landscape) {
+  .stats-page {
+    padding-bottom: 80px;
+  }
+
+  .stats-cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .global-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-container { height: 140px; }
 }
 </style>
