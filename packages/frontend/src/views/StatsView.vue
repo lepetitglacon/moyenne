@@ -644,8 +644,10 @@ function getBadgeName(key: string): string {
                 <div class="badges-earned" v-if="stats.badges?.length">
                   <div class="badge-item" v-for="badge in stats.badges" :key="badge.id" :title="badge.description">
                     <span class="badge-icon">{{ badge.icon }}</span>
+                    <span class="badge-name">{{ badge.name }}</span>
                   </div>
                 </div>
+                <div class="badges-empty" v-else>Aucun badge obtenu</div>
                 <div class="badges-progress" v-if="stats.badgeProgress">
                   <div class="progress-item" v-for="(prog, key) in stats.badgeProgress" :key="key">
                     <div class="progress-header">
@@ -665,33 +667,39 @@ function getBadgeName(key: string): string {
             <div class="dashboard-col">
               <div class="graph-box">
                 <div class="graph-title">Evolution 12 mois</div>
-                <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                  <line v-for="i in 5" :key="'grid-' + i"
-                    :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                    :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                    class="grid-line" />
-                  <text v-for="i in 5" :key="'y-' + i" :x="chartPadding - 6"
-                    :y="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4 + 3"
-                    class="axis-label" text-anchor="end">{{ 20 - (i - 1) * 5 }}</text>
-                  <polyline v-if="globalLinePoints" :points="globalLinePoints" class="global-line" fill="none" />
-                  <polyline v-if="lineChartPoints" :points="lineChartPoints" class="user-line" fill="none" />
-                </svg>
-                <div class="chart-legend">
-                  <span class="legend-item"><span class="legend-dot legend-dot--user"></span>Moi</span>
-                  <span class="legend-item"><span class="legend-dot legend-dot--global"></span>Global</span>
-                </div>
+                <template v-if="lineChartPoints || globalLinePoints">
+                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
+                    <line v-for="i in 5" :key="'grid-' + i"
+                      :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
+                      :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
+                      class="grid-line" />
+                    <text v-for="i in 5" :key="'y-' + i" :x="chartPadding - 6"
+                      :y="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4 + 3"
+                      class="axis-label" text-anchor="end">{{ 20 - (i - 1) * 5 }}</text>
+                    <polyline v-if="globalLinePoints" :points="globalLinePoints" class="global-line" fill="none" />
+                    <polyline v-if="lineChartPoints" :points="lineChartPoints" class="user-line" fill="none" />
+                  </svg>
+                  <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-dot legend-dot--user"></span>Moi</span>
+                    <span class="legend-item"><span class="legend-dot legend-dot--global"></span>Global</span>
+                  </div>
+                </template>
+                <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
               <div class="graph-box">
                 <div class="graph-title">Moyenne par jour</div>
-                <div class="dow-chart">
-                  <div v-for="d in dayOfWeekData" :key="'dow-' + d.dayOfWeek" class="dow-item">
-                    <div class="dow-bar-container">
-                      <div class="dow-bar" :style="{ height: `${(d.avgRating / 20) * 100}%`, background: ratingToColor(d.avgRating) }"></div>
+                <template v-if="dayOfWeekData.length && dayOfWeekData.some(d => d.avgRating > 0)">
+                  <div class="dow-chart">
+                    <div v-for="d in dayOfWeekData" :key="'dow-' + d.dayOfWeek" class="dow-item">
+                      <div class="dow-bar-container">
+                        <div class="dow-bar" :style="{ height: `${(d.avgRating / 20) * 100}%`, background: ratingToColor(d.avgRating) }"></div>
+                      </div>
+                      <span class="dow-label">{{ dayLabels[d.dayOfWeek] }}</span>
                     </div>
-                    <span class="dow-label">{{ dayLabels[d.dayOfWeek] }}</span>
                   </div>
-                </div>
+                </template>
+                <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
               <!-- Heatmap compact -->
@@ -825,15 +833,18 @@ function getBadgeName(key: string): string {
 
             <!-- Column 2: Chart + Participants -->
             <div class="global-col">
-              <div class="graph-box" v-if="graphs?.globalMonthly.length">
+              <div class="graph-box">
                 <div class="graph-title">Evolution 12 mois</div>
-                <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                  <line v-for="i in 5" :key="'grid-' + i"
-                    :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                    :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
-                    class="grid-line" />
-                  <polyline :points="globalLinePoints" class="global-line-main" fill="none" />
-                </svg>
+                <template v-if="graphs?.globalMonthly?.length && globalLinePoints">
+                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
+                    <line v-for="i in 5" :key="'grid-' + i"
+                      :x1="chartPadding" :y1="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
+                      :x2="chartWidth - chartPadding" :y2="chartPadding + ((i - 1) * (chartHeight - chartPadding * 2)) / 4"
+                      class="grid-line" />
+                    <polyline :points="globalLinePoints" class="global-line-main" fill="none" />
+                  </svg>
+                </template>
+                <div v-else class="graph-empty">Pas encore de donnees</div>
               </div>
 
               <div class="lb-section">
@@ -887,50 +898,48 @@ function getBadgeName(key: string): string {
 </template>
 
 <style scoped>
-/* Full-height layout without scroll */
+/* Scrollable layout */
 .stats-page {
   width: 100%;
-  max-width: 1600px;
-  height: calc(100vh - 60px);
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
-/* Header with tabs inline */
+/* Header */
 .stats-header {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.stats-logo { width: 32px; height: auto; }
-.stats-title { font-size: 16px; font-weight: 800; margin: 0; white-space: nowrap; }
+.stats-logo { width: 40px; height: auto; }
+.stats-title { font-size: 20px; font-weight: 800; margin: 0; }
 
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .tab {
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
   border: 1px solid rgba(255,255,255,.1);
   background: rgba(255,255,255,.04);
   color: rgba(255,255,255,.7);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -946,180 +955,177 @@ function getBadgeName(key: string): string {
 
 .profile-select {
   appearance: none;
-  height: 30px;
-  padding: 0 26px 0 10px;
-  border-radius: 6px;
+  height: 38px;
+  padding: 0 32px 0 14px;
+  border-radius: 8px;
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(20,22,40,.95);
   color: rgba(255,255,255,.92);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   color-scheme: dark;
 }
 
 .select-chevron {
   position: absolute;
-  right: 10px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
   opacity: .6;
-  font-size: 10px;
+  font-size: 12px;
 }
 
-.loading-msg, .error-msg { text-align: center; padding: 30px; opacity: .7; }
+.loading-msg, .error-msg { text-align: center; padding: 40px; opacity: .7; }
 .error-msg { color: #ff7a7a; }
 
-/* Stats content fills remaining space */
+/* Stats content */
 .stats-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  gap: 20px;
 }
 
-/* Stats Cards - compact horizontal row */
+/* Stats Cards */
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 16px;
 }
 
 .card {
-  border-radius: 8px;
-  padding: 10px 8px;
+  border-radius: 12px;
+  padding: 20px 16px;
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.1);
   text-align: center;
 }
 
-.card-label { font-size: 9px; opacity: .6; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px; }
-.card-value { font-size: 18px; font-weight: 900; }
-.card-value small { font-size: 10px; opacity: .6; }
+.card-label { font-size: 11px; opacity: .6; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.card-value { font-size: 28px; font-weight: 900; }
+.card-value small { font-size: 14px; opacity: .6; }
 .card--streak .card-value { color: #ff9500; }
 
 /* Dashboard Grid */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr) minmax(220px, 1fr);
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 20px;
+  align-items: start;
 }
 
 .dashboard-grid.two-columns {
-  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.3fr);
+  grid-template-columns: 1fr 1.3fr;
 }
 
 .dashboard-col {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-  overflow-y: auto;
+  gap: 16px;
 }
 
-/* Graph boxes - compact */
+/* Graph boxes */
 .graph-box {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  padding: 10px;
-  flex-shrink: 0;
+  border-radius: 12px;
+  padding: 16px;
 }
 
 .graph-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .graph-title {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
   opacity: .85;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .graph-header .graph-title { margin-bottom: 0; }
 
-.line-chart { width: 100%; height: auto; max-height: 120px; }
+.graph-empty {
+  text-align: center;
+  padding: 30px 10px;
+  opacity: .5;
+  font-size: 13px;
+}
+
+.line-chart { width: 100%; height: auto; }
 .grid-line { stroke: rgba(255,255,255,.08); stroke-width: 1; }
-.axis-label { fill: rgba(255,255,255,.4); font-size: 8px; }
-.user-line { stroke: rgba(255,180,100,.9); stroke-width: 2; stroke-linecap: round; }
+.axis-label { fill: rgba(255,255,255,.4); font-size: 10px; }
+.user-line { stroke: rgba(255,180,100,.9); stroke-width: 2.5; stroke-linecap: round; }
 .global-line { stroke: rgba(255,255,255,.25); stroke-width: 1.5; stroke-dasharray: 4 4; }
-.global-line-main { stroke: rgba(100,200,255,.8); stroke-width: 2; stroke-linecap: round; }
+.global-line-main { stroke: rgba(100,200,255,.8); stroke-width: 2.5; stroke-linecap: round; }
 
 .chart-legend {
   display: flex;
-  gap: 14px;
+  gap: 20px;
   justify-content: center;
-  margin-top: 6px;
+  margin-top: 12px;
 }
 
-.legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; opacity: .7; }
-.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .7; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 .legend-dot--user { background: rgba(255,180,100,.9); }
 .legend-dot--global { background: rgba(255,255,255,.3); }
 
-/* Day of week chart - compact */
-.dow-chart { display: flex; justify-content: space-between; gap: 4px; height: 60px; }
-.dow-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+/* Day of week chart */
+.dow-chart { display: flex; justify-content: space-between; gap: 8px; height: 100px; }
+.dow-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .dow-bar-container { flex: 1; width: 100%; display: flex; align-items: flex-end; }
-.dow-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
-.dow-label { font-size: 8px; opacity: .5; font-weight: 600; }
+.dow-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; }
+.dow-label { font-size: 11px; opacity: .6; font-weight: 600; }
 
-/* Calendar section - compact */
+/* Calendar section */
 .calendar-section {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  padding: 10px;
-  flex-shrink: 0;
+  border-radius: 12px;
+  padding: 16px;
 }
 
-.calendar-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.calendar-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .cal-nav {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.1);
   color: rgba(255,255,255,.9);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .cal-nav:hover { background: rgba(255,255,255,.12); }
-.cal-month { font-weight: 700; font-size: 12px; text-transform: capitalize; flex: 1; text-align: center; }
+.cal-month { font-weight: 700; font-size: 15px; text-transform: capitalize; flex: 1; text-align: center; }
 
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  margin-bottom: 4px;
+  gap: 4px;
+  margin-bottom: 6px;
   text-align: center;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   opacity: .5;
 }
 
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 
 .cal-day {
   position: relative;
-  border-radius: 4px;
+  border-radius: 6px;
   aspect-ratio: 1;
-  min-height: 22px;
-  padding: 1px;
+  min-height: 32px;
+  padding: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1129,32 +1135,49 @@ function getBadgeName(key: string): string {
 
 .cal-day:hover { opacity: .85; }
 .cal-day.empty { background: transparent !important; border: none !important; }
-.day-num { font-size: 9px; font-weight: 700; opacity: .9; }
+.day-num { font-size: 12px; font-weight: 700; opacity: .9; }
 
-/* Heatmap - compact */
+/* Heatmap */
 .heatmap-box { overflow: hidden; }
 .heatmap-grid {
   display: grid;
   grid-template-columns: repeat(53, 1fr);
   grid-template-rows: repeat(7, 1fr);
   grid-auto-flow: column;
-  gap: 1px;
+  gap: 2px;
   width: 100%;
 }
 .heatmap-week { display: contents; }
-.heatmap-day { aspect-ratio: 1; border-radius: 1px; min-width: 2px; }
+.heatmap-day { aspect-ratio: 1; border-radius: 2px; min-width: 4px; }
 .heatmap-day:hover { outline: 1px solid rgba(255,255,255,.4); }
 
-.year-nav { display: flex; align-items: center; gap: 4px; }
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: .6;
+}
+
+.legend-gradient {
+  width: 80px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgb(220,60,70), rgb(40,200,90));
+}
+
+.year-nav { display: flex; align-items: center; gap: 8px; }
+.year-label { font-size: 14px; font-weight: 700; }
 
 .nav-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.1);
   color: rgba(255,255,255,.9);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.2s;
@@ -1162,104 +1185,111 @@ function getBadgeName(key: string): string {
 
 .nav-btn:hover { background: rgba(255,255,255,.12); }
 
-/* Badges section - compact */
+/* Badges section */
 .badges-section {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  padding: 10px;
-  flex-shrink: 0;
+  border-radius: 12px;
+  padding: 16px;
 }
 
 .section-title {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .badges-earned {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .badge-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+  gap: 6px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, rgba(255,215,0,.15), rgba(255,180,0,.1));
   border: 1px solid rgba(255,215,0,.3);
-  border-radius: 50%;
+  border-radius: 20px;
   cursor: default;
 }
 
-.badge-icon { font-size: 14px; }
+.badge-icon { font-size: 16px; }
+.badge-name { font-size: 12px; font-weight: 600; }
+
+.badges-empty {
+  text-align: center;
+  padding: 16px;
+  opacity: .5;
+  font-size: 13px;
+}
 
 .badges-progress {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
 .progress-item {
   background: rgba(255,255,255,.03);
-  border-radius: 6px;
-  padding: 6px 8px;
+  border-radius: 8px;
+  padding: 10px 12px;
 }
 
 .progress-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.progress-name { font-size: 9px; font-weight: 600; opacity: .8; }
-.progress-value { font-size: 9px; opacity: .6; }
+.progress-name { font-size: 12px; font-weight: 600; opacity: .8; }
+.progress-value { font-size: 11px; opacity: .6; }
 
 .progress-bar {
-  height: 4px;
+  height: 6px;
   background: rgba(255,255,255,.08);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #ff9500, #ffcc00);
-  border-radius: 2px;
+  border-radius: 3px;
   transition: width 0.3s ease;
 }
 
 .edit-btn {
   width: 100%;
-  padding: 8px 12px;
-  font-size: 11px;
-  flex-shrink: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-top: 8px;
 }
 
-/* Tags Analysis Section - compact */
+/* Tags Analysis Section */
 .tags-section, .category-section {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  padding: 10px;
-  flex-shrink: 0;
+  border-radius: 12px;
+  padding: 16px;
 }
 
 .tags-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .tags-column-title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
 }
 
 .tags-column-title.positive { color: #4ade80; }
@@ -1268,71 +1298,71 @@ function getBadgeName(key: string): string {
 .tag-impact-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .tag-impact-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 5px;
-  font-size: 10px;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .tag-impact-item.positive { background: rgba(74,222,128,.1); }
 .tag-impact-item.negative { background: rgba(248,113,113,.1); }
 
-.tag-icon { font-size: 11px; }
-.tag-name { flex: 1; font-size: 10px; }
-.tag-impact-value { font-weight: 800; font-size: 10px; }
+.tag-icon { font-size: 14px; }
+.tag-name { flex: 1; font-size: 13px; }
+.tag-impact-value { font-weight: 800; font-size: 13px; }
 .tag-impact-item.positive .tag-impact-value { color: #4ade80; }
 .tag-impact-item.negative .tag-impact-value { color: #f87171; }
 
 .tags-empty {
   text-align: center;
   opacity: .5;
-  font-size: 10px;
-  padding: 12px 8px;
+  font-size: 13px;
+  padding: 20px 12px;
 }
 
-/* Category table - compact */
+/* Category table */
 .category-table {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .category-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: 12px;
+  padding: 10px 12px;
   background: rgba(255,255,255,.03);
-  border-radius: 5px;
+  border-radius: 8px;
 }
 
 .category-info {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-width: 70px;
+  gap: 8px;
+  min-width: 90px;
 }
 
-.category-icon { font-size: 11px; }
-.category-name { font-size: 10px; font-weight: 600; }
+.category-icon { font-size: 16px; }
+.category-name { font-size: 13px; font-weight: 600; }
 
 .category-bar-container {
   flex: 1;
-  height: 6px;
+  height: 8px;
   background: rgba(255,255,255,.08);
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .category-bar {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width 0.3s ease;
 }
 
@@ -1340,10 +1370,10 @@ function getBadgeName(key: string): string {
 .category-bar.negative { background: linear-gradient(90deg, #ef4444, #f87171); }
 
 .category-impact {
-  min-width: 35px;
+  min-width: 45px;
   text-align: right;
   font-weight: 800;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .category-impact.positive { color: #4ade80; }
@@ -1352,16 +1382,16 @@ function getBadgeName(key: string): string {
 /* Calendar Tooltip */
 .cal-tooltip {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  min-width: 160px;
-  max-width: 220px;
-  padding: 10px;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 14px;
   background: rgba(25, 28, 50, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   animation: tooltipFadeIn 0.15s ease;
@@ -1373,7 +1403,7 @@ function getBadgeName(key: string): string {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 5px solid transparent;
+  border: 6px solid transparent;
   border-top-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -1386,129 +1416,122 @@ function getBadgeName(key: string): string {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-  padding-bottom: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.tooltip-date { font-size: 10px; opacity: 0.6; }
-.tooltip-rating { font-size: 14px; font-weight: 800; color: #ffcc00; }
+.tooltip-date { font-size: 12px; opacity: 0.6; }
+.tooltip-rating { font-size: 18px; font-weight: 800; color: #ffcc00; }
 
 .tooltip-comment {
-  font-size: 10px;
+  font-size: 13px;
   font-style: italic;
   opacity: 0.85;
-  line-height: 1.3;
-  margin-bottom: 6px;
+  line-height: 1.4;
+  margin-bottom: 10px;
   word-break: break-word;
 }
 
 .tooltip-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .tooltip-tag {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* ==================== GLOBAL TAB STYLES ==================== */
-.global-content {
-  overflow: hidden;
-}
+.global-content { }
 
 .global-top-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .month-nav-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .month-label-inline {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   text-transform: capitalize;
-  min-width: 120px;
+  min-width: 150px;
   text-align: center;
 }
 
 .global-summary {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   flex: 1;
 }
 
 .summary-card {
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 8px;
-  padding: 10px 16px;
+  border-radius: 12px;
+  padding: 16px 20px;
   text-align: center;
   flex: 1;
 }
 
-.summary-label { font-size: 9px; opacity: .6; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .3px; }
-.summary-value { font-size: 18px; font-weight: 900; }
-.summary-value small { font-size: 10px; opacity: .6; }
+.summary-label { font-size: 11px; opacity: .6; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.summary-value { font-size: 24px; font-weight: 900; }
+.summary-value small { font-size: 12px; opacity: .6; }
 
 /* Global 3-column grid */
 .global-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  gap: 20px;
+  align-items: start;
 }
 
 .global-col {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-  overflow-y: auto;
+  gap: 16px;
 }
 
-/* Leaderboard styles - compact */
+/* Leaderboard styles */
 .lb-section {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  padding: 10px;
-  flex-shrink: 0;
+  border-radius: 12px;
+  padding: 16px;
 }
 
-.lb-title { font-size: 11px; font-weight: 700; opacity: .85; margin-bottom: 8px; }
-.lb-list { display: flex; flex-direction: column; gap: 4px; }
+.lb-title { font-size: 14px; font-weight: 700; opacity: .85; margin-bottom: 12px; }
+.lb-list { display: flex; flex-direction: column; gap: 8px; }
 
 .lb-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 12px;
+  padding: 10px 14px;
   background: rgba(255,255,255,.04);
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .lb-row:hover { background: rgba(255,255,255,.08); }
 
 .rank {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: rgba(255,255,255,.08);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 10px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
@@ -1516,22 +1539,22 @@ function getBadgeName(key: string): string {
 .medal--silver { background: linear-gradient(135deg, rgba(192,192,192,.25), rgba(160,160,160,.15)); border: 1px solid rgba(192,192,192,.35); color: rgba(220,220,220,.95); }
 .medal--bronze { background: linear-gradient(135deg, rgba(205,127,50,.25), rgba(180,100,40,.15)); border: 1px solid rgba(205,127,50,.35); color: rgba(230,180,130,.95); }
 
-.lb-user { flex: 1; font-weight: 700; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-score { font-weight: 800; font-size: 11px; opacity: .9; flex-shrink: 0; }
+.lb-user { flex: 1; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-score { font-weight: 800; font-size: 14px; opacity: .9; flex-shrink: 0; }
 .lb-empty {
   text-align: center;
   opacity: .5;
-  font-size: 10px;
-  padding: 12px 8px;
+  font-size: 13px;
+  padding: 20px 12px;
 }
 
 .lb-tags {
   display: flex;
-  gap: 3px;
-  margin-right: 8px;
+  gap: 4px;
+  margin-right: 10px;
 }
 
-.mini-tag { font-size: 12px; }
+.mini-tag { font-size: 16px; }
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1200px) {
@@ -1542,7 +1565,6 @@ function getBadgeName(key: string): string {
 }
 
 @media (max-width: 900px) {
-  .stats-page { height: auto; overflow: auto; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .dashboard-col:nth-child(3) { display: flex; }
   .stats-cards { grid-template-columns: repeat(2, 1fr); }
@@ -1550,15 +1572,18 @@ function getBadgeName(key: string): string {
   .global-col:nth-child(3) { display: flex; }
   .global-top-row { flex-direction: column; align-items: stretch; }
   .global-summary { flex-direction: row; }
+  .tags-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
-  .stats-page { padding: 10px 12px; gap: 8px; }
+  .stats-page { padding: 16px; gap: 16px; }
   .stats-header { flex-wrap: wrap; }
-  .header-left { width: 100%; }
+  .header-left { width: 100%; margin-bottom: 8px; }
   .profile-switch { margin-left: 0; }
+  .tabs { width: 100%; }
+  .tab { flex: 1; text-align: center; }
   .stats-cards { grid-template-columns: repeat(2, 1fr); }
-  .card { padding: 8px 6px; }
-  .card-value { font-size: 16px; }
+  .card { padding: 14px 10px; }
+  .card-value { font-size: 22px; }
 }
 </style>
