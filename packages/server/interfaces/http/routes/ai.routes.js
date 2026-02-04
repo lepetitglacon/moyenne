@@ -71,16 +71,21 @@ export function createAiRoutes({ config, authenticateToken, logger }) {
         return res.status(503).json({ error: "Service IA non configure" });
       }
 
-      const systemPrompt = `Tu es un assistant qui aide a ameliorer des commentaires personnels sur la journee d'une personne.
-L'utilisateur ecrit un commentaire sur sa journee et tu dois l'ameliorer en:
-- Corrigeant les fautes d'orthographe et de grammaire
-- Rendant le texte plus fluide et agreable a lire
-- Gardant le ton et le sens original (si c'est negatif, garde le negatif, si c'est positif, garde le positif)
-- Gardant la meme longueur approximative
-- NE PAS ajouter de details inventes
-- NE PAS changer le sens ou les faits mentionnes
+      const systemPrompt = `Tu es un ecrivain talentueux qui aide a transformer des notes de journee en textes vivants et expressifs.
 
-Reponds UNIQUEMENT avec le texte ameliore, sans explications ni commentaires.`;
+A partir du commentaire de l'utilisateur sur sa journee, tu dois:
+- Corriger les fautes d'orthographe et de grammaire
+- Developper le texte avec un style litteraire agreable (metaphores, expressions, tournures elegantes)
+- Ajouter de la personnalite et de l'emotion au recit
+- Garder le TON original (si c'est une mauvaise journee, garde le cote negatif/sarcastique/fatigue)
+- Rester fidele aux FAITS mentionnes (ne pas inventer d'evenements)
+- Doubler ou tripler la longueur si le texte est tres court
+
+Exemples de transformation:
+- "journee nulle, fatigue" → "Une de ces journees ou meme le cafe n'a pas reussi a me sortir de ma torpeur. La fatigue m'a colle a la peau du matin au soir."
+- "super journee, vu des potes" → "Quelle bouffee d'air frais ! Retrouver mes potes m'a rappele pourquoi ces moments comptent autant. On a ri, on a parle de tout et de rien, et ca m'a fait un bien fou."
+
+Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans commentaires.`;
 
       const userPrompt = `Texte original:\n${text}`;
 
@@ -98,8 +103,8 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications ni commentaires.`;
           name: `llm-call-attempt-${attemptNumber}`,
           model,
           modelParameters: {
-            temperature: 0.3,
-            max_tokens: 500,
+            temperature: 0.7,
+            max_tokens: 800,
           },
           input: {
             system: systemPrompt,
@@ -125,8 +130,8 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications ni commentaires.`;
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
               ],
-              temperature: 0.3,
-              max_tokens: 500,
+              temperature: 0.7,
+              max_tokens: 800,
             }),
           });
 
@@ -205,7 +210,12 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications ni commentaires.`;
         return res.status(502).json({ error: "Erreur du service IA" });
       }
 
-      const improvedText = data.choices?.[0]?.message?.content?.trim();
+      let improvedText = data.choices?.[0]?.message?.content?.trim();
+
+      // Remove <think>...</think> tags from Qwen models
+      if (improvedText) {
+        improvedText = improvedText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      }
 
       if (!improvedText) {
         trace?.update({
