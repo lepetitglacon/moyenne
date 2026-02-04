@@ -257,9 +257,16 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans
 
       let improvedText = data.choices?.[0]?.message?.content?.trim();
 
-      // Remove <think>...</think> tags from Qwen models
+      // Remove <think>...</think> tags from Qwen models (and variations)
       if (improvedText) {
-        improvedText = improvedText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        // Remove complete <think>...</think> blocks
+        improvedText = improvedText.replace(/<think>[\s\S]*?<\/think>/gi, "");
+        // Remove unclosed <think>... (if model cut off)
+        improvedText = improvedText.replace(/<think>[\s\S]*/gi, "");
+        // Remove any remaining </think> tags
+        improvedText = improvedText.replace(/<\/think>/gi, "");
+        // Clean up extra whitespace
+        improvedText = improvedText.trim();
       }
 
       if (!improvedText) {
