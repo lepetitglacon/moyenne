@@ -19,6 +19,13 @@ const selectedTags = ref<string[]>([]);
 const showTags = ref(false);
 const newBadges = ref<string[]>([]);
 const improving = ref(false);
+const creativityLevel = ref(2);
+
+const creativityLevels = [
+  { level: 1, label: "Correction", icon: "📝", description: "Orthographe uniquement" },
+  { level: 2, label: "Moderate", icon: "✨", description: "Legerement ameliore" },
+  { level: 3, label: "Creatif", icon: "🎨", description: "Style litteraire" },
+];
 
 const moodLabels = [
   "J'AURAIS PREFERE CREVER",
@@ -188,7 +195,7 @@ async function improveComment() {
   try {
     const res = await authFetch("/api/ai/improve-text", {
       method: "POST",
-      body: JSON.stringify({ text: dayComment.value }),
+      body: JSON.stringify({ text: dayComment.value, level: creativityLevel.value }),
     });
 
     if (!res.ok) {
@@ -279,17 +286,33 @@ async function improveComment() {
             @input="error = null"
           />
 
-          <button
-            type="button"
-            class="btn-improve"
-            @click="improveComment"
-            :disabled="improving || !dayComment.trim()"
-            :title="!dayComment.trim() ? 'Ecris d\'abord un commentaire' : 'Ameliorer avec l\'IA'"
-          >
-            <span v-if="improving" class="improve-spinner"></span>
-            <span v-else class="improve-icon">&#10024;</span>
-            {{ improving ? "Amelioration..." : "Ameliorer" }}
-          </button>
+          <div class="improve-section">
+            <div class="creativity-selector">
+              <button
+                v-for="lvl in creativityLevels"
+                :key="lvl.level"
+                type="button"
+                class="creativity-btn"
+                :class="{ 'creativity-btn--active': creativityLevel === lvl.level }"
+                @click="creativityLevel = lvl.level"
+                :title="lvl.description"
+              >
+                <span class="creativity-icon">{{ lvl.icon }}</span>
+                <span class="creativity-label">{{ lvl.label }}</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              class="btn-improve"
+              @click="improveComment"
+              :disabled="improving || !dayComment.trim()"
+              :title="!dayComment.trim() ? 'Ecris d\'abord un commentaire' : 'Ameliorer avec l\'IA'"
+            >
+              <span v-if="improving" class="improve-spinner"></span>
+              <span v-else class="improve-icon">&#10024;</span>
+              {{ improving ? "Amelioration..." : "Ameliorer" }}
+            </button>
+          </div>
 
           <button
             class="btn btn-primary btn-wide"
@@ -322,9 +345,7 @@ async function improveComment() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  margin-top: 8px;
-  margin-bottom: 12px;
+  padding: 8px 20px;
   background: linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(79, 70, 229, 0.2));
   border: 1px solid rgba(147, 51, 234, 0.4);
   border-radius: 8px;
@@ -364,6 +385,62 @@ async function improveComment() {
   to {
     transform: rotate(360deg);
   }
+}
+
+.improve-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.creativity-selector {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.creativity-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.creativity-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.creativity-btn--active {
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(79, 70, 229, 0.25));
+  border-color: rgba(147, 51, 234, 0.5);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.creativity-icon {
+  font-size: 16px;
+}
+
+.creativity-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .tags-toggle {

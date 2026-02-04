@@ -71,7 +71,44 @@ export function createAiRoutes({ config, authenticateToken, logger }) {
         return res.status(503).json({ error: "Service IA non configure" });
       }
 
-      const systemPrompt = `Tu es un ecrivain talentueux qui aide a transformer des notes de journee en textes vivants et expressifs.
+      // Creativity levels configuration
+      const creativityLevels = {
+        1: {
+          name: "correction",
+          temperature: 0.2,
+          max_tokens: 500,
+          prompt: `Tu es un correcteur orthographique et grammatical.
+
+A partir du commentaire de l'utilisateur, tu dois UNIQUEMENT:
+- Corriger les fautes d'orthographe
+- Corriger les fautes de grammaire
+- Corriger la ponctuation
+- Garder EXACTEMENT le meme style, les memes mots, la meme longueur
+- NE PAS reformuler, NE PAS embellir, NE PAS developper
+
+Reponds UNIQUEMENT avec le texte corrige, sans explications, sans balises, sans commentaires.`,
+        },
+        2: {
+          name: "moderate",
+          temperature: 0.5,
+          max_tokens: 600,
+          prompt: `Tu es un assistant d'ecriture qui aide a ameliorer des commentaires personnels.
+
+A partir du commentaire de l'utilisateur sur sa journee, tu dois:
+- Corriger les fautes d'orthographe et de grammaire
+- Ameliorer legerement la fluidite et la clarte du texte
+- Garder le TON et le STYLE original de l'utilisateur
+- Garder une longueur similaire (max +50%)
+- NE PAS inventer de details ou d'evenements
+- Rester sobre, pas de metaphores excessives
+
+Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans commentaires.`,
+        },
+        3: {
+          name: "creative",
+          temperature: 0.7,
+          max_tokens: 800,
+          prompt: `Tu es un ecrivain talentueux qui aide a transformer des notes de journee en textes vivants et expressifs.
 
 A partir du commentaire de l'utilisateur sur sa journee, tu dois:
 - Corriger les fautes d'orthographe et de grammaire
@@ -85,8 +122,14 @@ Exemples de transformation:
 - "journee nulle, fatigue" → "Une de ces journees ou meme le cafe n'a pas reussi a me sortir de ma torpeur. La fatigue m'a colle a la peau du matin au soir."
 - "super journee, vu des potes" → "Quelle bouffee d'air frais ! Retrouver mes potes m'a rappele pourquoi ces moments comptent autant. On a ri, on a parle de tout et de rien, et ca m'a fait un bien fou."
 
-Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans commentaires.`;
+Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans commentaires.`,
+        },
+      };
 
+      const level = req.body.level || 2;
+      const levelConfig = creativityLevels[level] || creativityLevels[2];
+
+      const systemPrompt = levelConfig.prompt;
       const userPrompt = `Texte original:\n${text}`;
 
       const models = ["qwen/qwen3-32b", "llama-3.1-8b-instant"];
@@ -103,8 +146,10 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans
           name: `llm-call-attempt-${attemptNumber}`,
           model,
           modelParameters: {
-            temperature: 0.7,
-            max_tokens: 800,
+            temperature: levelConfig.temperature,
+            max_tokens: levelConfig.max_tokens,
+            creativityLevel: level,
+            creativityName: levelConfig.name,
           },
           input: {
             system: systemPrompt,
@@ -130,8 +175,8 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
               ],
-              temperature: 0.7,
-              max_tokens: 800,
+              temperature: levelConfig.temperature,
+              max_tokens: levelConfig.max_tokens,
             }),
           });
 
