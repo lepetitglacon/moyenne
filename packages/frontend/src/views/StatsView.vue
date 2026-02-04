@@ -725,7 +725,7 @@ function getBadgeName(key: string): string {
 </script>
 
 <template>
-  <AppShell variant="center" :showDecor="false">
+  <AppShell variant="wide" :showDecor="false">
     <div class="stats-page">
       <header class="stats-header">
         <div class="header-left">
