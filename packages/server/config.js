@@ -28,6 +28,14 @@ const config = {
   // Optional with safe defaults
   frontendUrl: optionalEnv("FRONTEND_URL", "http://localhost:5173"),
   logLevel: optionalEnv("LOG_LEVEL", "INFO"),
+
+  // Groq AI (optional - for comment improvement feature)
+  groqApiKey: optionalEnv("GROQ_API_KEY", ""),
+
+  // Langfuse (optional - for LLM observability)
+  langfuseSecretKey: optionalEnv("LANGFUSE_SECRET_KEY", ""),
+  langfusePublicKey: optionalEnv("LANGFUSE_PUBLIC_KEY", ""),
+  langfuseBaseUrl: optionalEnv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
 };
 
 export default config;

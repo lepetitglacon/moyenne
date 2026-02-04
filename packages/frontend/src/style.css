@@ -253,6 +253,45 @@ html, body{
   width: min(460px, 92vw);
   width: 100%;
   margin: 8px 0 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 8px;
+  background: rgba(215, 220, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(215, 220, 255, 0.3);
+}
+
+.range::-moz-range-track {
+  height: 8px;
+  background: rgba(215, 220, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(215, 220, 255, 0.3);
+}
+
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  margin-top: -9px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
 }
 
 .textarea{
@@ -527,11 +566,32 @@ html, body{
     height: 40px;
     -webkit-appearance: none;
     appearance: none;
+    background: transparent;
+  }
+
+  .range::-webkit-slider-runnable-track {
+    height: 10px;
+    background: rgba(215, 220, 255, 0.2);
+    border-radius: 5px;
+    border: 1px solid rgba(215, 220, 255, 0.3);
+  }
+
+  .range::-moz-range-track {
+    height: 10px;
+    background: rgba(215, 220, 255, 0.2);
+    border-radius: 5px;
+    border: 1px solid rgba(215, 220, 255, 0.3);
   }
 
   .range::-webkit-slider-thumb {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
+    margin-top: -12px;
+  }
+
+  .range::-moz-range-thumb {
+    width: 32px;
+    height: 32px;
   }
 
   /* Textarea */

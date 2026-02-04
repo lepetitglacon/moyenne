@@ -18,6 +18,7 @@ const loading = ref(true);
 const selectedTags = ref<string[]>([]);
 const showTags = ref(false);
 const newBadges = ref<string[]>([]);
+const improving = ref(false);
 
 const moodLabels = [
   "J'AURAIS PREFERE CREVER",
@@ -177,6 +178,34 @@ async function next() {
 function toggleTagSection() {
   showTags.value = !showTags.value;
 }
+
+async function improveComment() {
+  if (!dayComment.value.trim() || improving.value) return;
+
+  improving.value = true;
+  error.value = null;
+
+  try {
+    const res = await authFetch("/api/ai/improve-text", {
+      method: "POST",
+      body: JSON.stringify({ text: dayComment.value }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || "Erreur lors de l'amelioration");
+    }
+
+    const { improvedText } = await res.json();
+    if (improvedText) {
+      dayComment.value = improvedText;
+    }
+  } catch (e: any) {
+    error.value = e?.message ?? "Impossible d'ameliorer le texte";
+  } finally {
+    improving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -251,6 +280,18 @@ function toggleTagSection() {
           />
 
           <button
+            type="button"
+            class="btn-improve"
+            @click="improveComment"
+            :disabled="improving || !dayComment.trim()"
+            :title="!dayComment.trim() ? 'Ecris d\'abord un commentaire' : 'Ameliorer avec l\'IA'"
+          >
+            <span v-if="improving" class="improve-spinner"></span>
+            <span v-else class="improve-icon">&#10024;</span>
+            {{ improving ? "Amelioration..." : "Ameliorer" }}
+          </button>
+
+          <button
             class="btn btn-primary btn-wide"
             type="button"
             @click="next"
@@ -274,6 +315,55 @@ function toggleTagSection() {
   text-align: center;
   padding: 20px;
   opacity: 0.7;
+}
+
+.btn-improve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(79, 70, 229, 0.2));
+  border: 1px solid rgba(147, 51, 234, 0.4);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-improve:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.35), rgba(79, 70, 229, 0.35));
+  border-color: rgba(147, 51, 234, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-improve:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.improve-icon {
+  font-size: 14px;
+}
+
+.improve-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: rgba(147, 51, 234, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tags-toggle {
