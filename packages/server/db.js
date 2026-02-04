@@ -209,17 +209,33 @@ async function initDb() {
     dbLogger.info("Creating indexes...");
 
     const indexes = [
+      // Entries - frequent queries by user, date, or both
       { name: 'idx_entries_date', table: 'entries', column: 'date' },
       { name: 'idx_entries_user_date', table: 'entries', column: 'user_id, date' },
+      { name: 'idx_entries_user_id', table: 'entries', column: 'user_id' },
+
+      // Ratings - frequent queries for leaderboards and stats
+      { name: 'idx_ratings_date', table: 'ratings', column: 'date' },
       { name: 'idx_ratings_from_date', table: 'ratings', column: 'from_user_id, date' },
       { name: 'idx_ratings_to_date', table: 'ratings', column: 'to_user_id, date' },
+      { name: 'idx_ratings_from_user', table: 'ratings', column: 'from_user_id' },
+      { name: 'idx_ratings_to_user', table: 'ratings', column: 'to_user_id' },
+
+      // Review assignments - lookups by reviewer and date
+      { name: 'idx_assignments_date', table: 'review_assignments', column: 'date' },
+      { name: 'idx_assignments_reviewer_date', table: 'review_assignments', column: 'reviewer_id, date' },
+      { name: 'idx_assignments_reviewee_date', table: 'review_assignments', column: 'reviewee_id, date' },
+
+      // User sessions and events (if used later)
       { name: 'idx_sessions_user_login', table: 'user_sessions', column: 'user_id, login_at' },
       { name: 'idx_events_type_at', table: 'events', column: 'type, at' },
       { name: 'idx_events_user_at', table: 'events', column: 'user_id, at' },
+
+      // Badges and guesses
       { name: 'idx_user_badges_user', table: 'user_badges', column: 'user_id' },
-      { name: 'idx_assignments_date', table: 'review_assignments', column: 'date' },
       { name: 'idx_guesses_guesser', table: 'guesses', column: 'guesser_id' },
       { name: 'idx_guesses_date', table: 'guesses', column: 'date' },
+      { name: 'idx_guesses_guesser_date', table: 'guesses', column: 'guesser_id, date' },
     ];
 
     for (const idx of indexes) {
