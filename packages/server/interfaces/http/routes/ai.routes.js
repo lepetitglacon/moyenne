@@ -315,14 +315,9 @@ Reponds UNIQUEMENT avec le texte ameliore, sans explications, sans balises, sans
       });
 
       next(err);
-    } finally {
-      // Flush Langfuse to ensure data is sent
-      if (langfuse) {
-        langfuse.flush().catch((flushErr) => {
-          logger.warning("Langfuse flush error", { error: flushErr.message });
-        });
-      }
     }
+    // Note: Langfuse automatically batches and sends events in the background
+    // No manual flush needed for long-running Express servers
   });
 
   return router;
