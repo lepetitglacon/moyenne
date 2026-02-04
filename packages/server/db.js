@@ -1,6 +1,9 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 import bcrypt from "bcryptjs";
+import { Logger } from "./logger.js";
+
+const dbLogger = new Logger("DB");
 
 // Create PostgreSQL connection pool
 // Supports both connection string (DATABASE_URL) and individual variables
@@ -69,23 +72,20 @@ export const db = {
 };
 
 async function initDb() {
-  console.log('┌─────────────────────────────────────────────────────────────┐');
-  console.log('│                  DATABASE INITIALIZATION                    │');
-  console.log('└─────────────────────────────────────────────────────────────┘');
+  dbLogger.info("Database initialization started");
 
   try {
     // Test connection
-    console.log('\n📡 Testing database connection...');
+    dbLogger.info("Testing database connection...");
     const now = await pool.query('SELECT NOW() as time');
-    console.log(`   ✓ Connected to PostgreSQL at ${now.rows[0].time}`);
+    dbLogger.info("Connected to PostgreSQL", { time: now.rows[0].time });
 
     // ═══════════════════════════════════════════════════════════════
     // TABLES
     // ═══════════════════════════════════════════════════════════════
-    console.log('\n📋 Creating tables...');
+    dbLogger.info("Creating tables...");
 
     // Users
-    console.log('   → Creating table: users');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -95,10 +95,8 @@ async function initDb() {
         last_login_at TIMESTAMP
       )
     `);
-    console.log('   ✓ Table users ready');
 
     // Entries
-    console.log('   → Creating table: entries');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS entries (
         id SERIAL PRIMARY KEY,
@@ -112,10 +110,8 @@ async function initDb() {
         UNIQUE(user_id, date)
       )
     `);
-    console.log('   ✓ Table entries ready');
 
     // Review assignments
-    console.log('   → Creating table: review_assignments');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_assignments (
         id SERIAL PRIMARY KEY,
@@ -127,10 +123,8 @@ async function initDb() {
         UNIQUE(reviewee_id, date)
       )
     `);
-    console.log('   ✓ Table review_assignments ready');
 
     // Ratings
-    console.log('   → Creating table: ratings');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ratings (
         id SERIAL PRIMARY KEY,
@@ -142,10 +136,8 @@ async function initDb() {
         UNIQUE(from_user_id, to_user_id, date)
       )
     `);
-    console.log('   ✓ Table ratings ready');
 
     // User sessions
-    console.log('   → Creating table: user_sessions');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         id SERIAL PRIMARY KEY,
@@ -156,10 +148,8 @@ async function initDb() {
         user_agent TEXT
       )
     `);
-    console.log('   ✓ Table user_sessions ready');
 
     // Events
-    console.log('   → Creating table: events');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -169,10 +159,8 @@ async function initDb() {
         meta_json JSONB
       )
     `);
-    console.log('   ✓ Table events ready');
 
     // User badges
-    console.log('   → Creating table: user_badges');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_badges (
         id SERIAL PRIMARY KEY,
@@ -183,10 +171,8 @@ async function initDb() {
         UNIQUE(user_id, badge_type)
       )
     `);
-    console.log('   ✓ Table user_badges ready');
 
     // Guesses (detective game)
-    console.log('   → Creating table: guesses');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS guesses (
         id SERIAL PRIMARY KEY,
@@ -199,30 +185,28 @@ async function initDb() {
         UNIQUE(guesser_id, date)
       )
     `);
-    console.log('   ✓ Table guesses ready');
+
+    dbLogger.info("All tables ready");
 
     // ═══════════════════════════════════════════════════════════════
     // MIGRATIONS
     // ═══════════════════════════════════════════════════════════════
-    console.log('\n🔄 Running migrations...');
+    dbLogger.info("Running migrations...");
 
     // Migration: Add tags column to entries
-    console.log('   → Migration: Add tags column to entries');
     const tagsColumnCheck = await pool.query(`
       SELECT 1 FROM information_schema.columns
       WHERE table_name = 'entries' AND column_name = 'tags'
     `);
     if (tagsColumnCheck.rows.length === 0) {
       await pool.query(`ALTER TABLE entries ADD COLUMN tags JSONB DEFAULT '[]'`);
-      console.log('   ✓ Added tags column to entries');
-    } else {
-      console.log('   ✓ Tags column already exists');
+      dbLogger.info("Migration: Added tags column to entries");
     }
 
     // ═══════════════════════════════════════════════════════════════
     // INDEXES
     // ═══════════════════════════════════════════════════════════════
-    console.log('\n📇 Creating indexes...');
+    dbLogger.info("Creating indexes...");
 
     const indexes = [
       { name: 'idx_entries_date', table: 'entries', column: 'date' },
@@ -239,36 +223,24 @@ async function initDb() {
     ];
 
     for (const idx of indexes) {
-      console.log(`   → Creating index: ${idx.name}`);
       await pool.query(`CREATE INDEX IF NOT EXISTS ${idx.name} ON ${idx.table}(${idx.column})`);
     }
-    console.log(`   ✓ ${indexes.length} indexes ready`);
+    dbLogger.info("Indexes ready", { count: indexes.length });
 
     // ═══════════════════════════════════════════════════════════════
     // SEED DATA
     // ═══════════════════════════════════════════════════════════════
-    console.log('\n🌱 Checking seed data...');
-
     const admin = await pool.query("SELECT id FROM users WHERE username = $1", ["admin"]);
     if (admin.rows.length === 0) {
-      console.log('   → Creating admin user');
       const hashed = bcrypt.hashSync("admin123", 10);
       await pool.query("INSERT INTO users (username, password) VALUES ($1, $2)", ["admin", hashed]);
-      console.log('   ✓ Admin user created (admin / admin123)');
-    } else {
-      console.log('   ✓ Admin user already exists');
+      dbLogger.info("Admin user created", { username: "admin" });
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // SUMMARY
-    // ═══════════════════════════════════════════════════════════════
-    console.log('\n┌─────────────────────────────────────────────────────────────┐');
-    console.log('│              ✓ DATABASE INITIALIZATION COMPLETE             │');
-    console.log('└─────────────────────────────────────────────────────────────┘\n');
+    dbLogger.info("Database initialization complete");
 
   } catch (error) {
-    console.error('\n❌ DATABASE INITIALIZATION ERROR:', error.message);
-    console.error('   Stack:', error.stack);
+    dbLogger.error("Database initialization failed", { error: error.message, stack: error.stack });
     throw error;
   }
 }
