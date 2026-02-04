@@ -2208,8 +2208,9 @@ function getBadgeName(key: string): string {
 }
 
 /* Safe area for notched phones */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
+@supports (padding: env(safe-area-inset-top)) {
   .stats-page {
+    padding-top: max(12px, env(safe-area-inset-top));
     padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
 }

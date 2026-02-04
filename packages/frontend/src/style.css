@@ -489,11 +489,13 @@ html, body{
     min-height: 100vh;
     max-height: none;
     padding: 16px 16px 100px 16px;
+    padding-top: max(16px, env(safe-area-inset-top, 16px));
     overflow: visible;
   }
 
   .shell-content--wide {
     padding: 16px 16px 100px 16px;
+    padding-top: max(16px, env(safe-area-inset-top, 16px));
   }
 
   /* Hide decorations on mobile */
