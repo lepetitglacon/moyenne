@@ -15,8 +15,12 @@ export function createAuthRoutes({ authService }) {
   router.post("/login", async (req, res, next) => {
     try {
       const { username, password } = req.body;
-      const { token } = await authService.login({ username, password });
-      res.json({ token });
+      const result = await authService.login({ username, password });
+      res.json({
+        token: result.token,
+        refreshToken: result.refreshToken,
+        user: result.user,
+      });
     } catch (err) {
       next(err);
     }
