@@ -74,6 +74,7 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, guessRepo,
       rating: parseInt(entry.rating, 10) || 0,
       description: entry.description || null,
       tags: entry.tags || [],
+      gifUrl: entry.gif_url || null,
     };
   }
 
@@ -93,12 +94,13 @@ export function createStatsService({ userRepo, entryRepo, ratingRepo, guessRepo,
     const allEntries = allEntriesRaw.map(e => ({ date: normalizeDate(e.date) }));
     const streakData = calculateStreak(allEntries, today);
 
-    // Normalize month entries (include description and tags for tooltips)
+    // Normalize month entries (include description, tags, gifUrl for tooltips)
     const monthEntries = monthEntriesRaw.map(e => ({
       date: normalizeDate(e.date),
       rating: parseInt(e.rating, 10) || 0,
       description: e.description || null,
       tags: e.tags || [],
+      gifUrl: e.gif_url || null,
     }));
 
     return {

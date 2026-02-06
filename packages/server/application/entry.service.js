@@ -53,11 +53,13 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
      * @param {{ userId: number, rating: number, description?: string, tags?: string[] }} params
      * @returns {Promise<SaveEntryResult & { newBadges?: string[] }>}
      */
-    async saveEntry({ userId, rating, description, tags = [] }) {
+    async saveEntry({ userId, rating, description, tags = [], gifUrl = null }) {
       const today = getToday();
       // Validate tags - only keep valid tag IDs
       const validTags = Array.isArray(tags) ? tags.filter(t => typeof t === 'string') : [];
-      const { isUpdate } = await entryRepo.upsert(userId, today, rating, description, validTags);
+      // Validate gifUrl - only keep valid URL strings
+      const validGifUrl = typeof gifUrl === 'string' && gifUrl.trim() ? gifUrl.trim() : null;
+      const { isUpdate } = await entryRepo.upsert(userId, today, rating, description, validTags, validGifUrl);
 
       if (isUpdate) {
         logger?.debug("Entree mise a jour", { userId, date: today, rating });
@@ -100,6 +102,7 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
         rating: parseInt(entry.rating, 10) || 0,
         description: entry.description || '',
         tags: entry.tags || [],
+        gifUrl: entry.gif_url || null,
       };
     },
 
@@ -155,6 +158,7 @@ export function createEntryService({ entryRepo, ratingRepo, assignmentRepo, gues
         date: yesterday,
         description: entry.description,
         tags: entry.tags || [],
+        gifUrl: entry.gif_url || null,
         // NOTE: No username or rating returned - it's a double guessing game!
         // The actual rating is stored for validation but not sent to client
         _actualRating: parseInt(entry.rating, 10) || 0,

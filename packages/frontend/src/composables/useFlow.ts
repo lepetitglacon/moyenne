@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 const dayScore = ref<number>(0);
 const dayComment = ref<string>("");
 const dayTags = ref<string[]>([]);
+const dayGifUrl = ref<string | null>(null);
 
 const receivedComment = ref<string>(
   "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nam eu neque ac erat posuere fringilla."
@@ -18,6 +19,7 @@ export function useFlow() {
     dayScore.value = 0;
     dayComment.value = "";
     dayTags.value = [];
+    dayGifUrl.value = null;
     otherScore.value = 0;
   }
 
@@ -25,6 +27,7 @@ export function useFlow() {
     dayScore,
     dayComment,
     dayTags,
+    dayGifUrl,
     dayLabel,
     receivedComment,
     otherScore,

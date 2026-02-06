@@ -22,6 +22,7 @@ const target = ref<null | {
   date: string;
   description: string | null;
   tags: string[];
+  gifUrl: string | null;
 }>(null);
 
 // Guess result
@@ -123,6 +124,7 @@ onMounted(async () => {
       date: data.date,
       description: data.description,
       tags: data.tags || [],
+      gifUrl: data.gifUrl || null,
     };
   } catch (e: any) {
     error.value = e?.message ?? "Erreur reseau.";
@@ -294,6 +296,11 @@ function reload() {
             {{ commentText }}
           </div>
 
+          <!-- GIF -->
+          <div v-if="target.gifUrl" class="comment-gif">
+            <img :src="target.gifUrl" alt="GIF du jour" class="comment-gif-img" />
+          </div>
+
           <!-- Tags -->
           <div class="comment-tags" v-if="target.tags?.length">
             <span v-for="tag in target.tags" :key="tag" class="tag-chip">
@@ -362,6 +369,19 @@ function reload() {
 
 .comment-text--empty {
   opacity: 0.5;
+}
+
+.comment-gif {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.comment-gif-img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 .comment-tags {

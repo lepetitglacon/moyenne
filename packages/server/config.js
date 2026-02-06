@@ -32,6 +32,9 @@ const config = {
   // Groq AI (optional - for comment improvement feature)
   groqApiKey: optionalEnv("GROQ_API_KEY", ""),
 
+  // GIPHY (optional - for GIF picker)
+  giphyApiKey: optionalEnv("GIPHY_API_KEY", ""),
+
   // Langfuse (optional - for LLM observability)
   langfuseSecretKey: optionalEnv("LANGFUSE_SECRET_KEY", ""),
   langfusePublicKey: optionalEnv("LANGFUSE_PUBLIC_KEY", ""),

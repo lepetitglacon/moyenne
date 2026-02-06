@@ -51,7 +51,7 @@ function getCurrentUserId(): number | null {
 const currentUserId = computed(() => getCurrentUserId());
 
 // Types
-type MonthEntry = { date: string; rating: number; description: string | null; tags: string[] };
+type MonthEntry = { date: string; rating: number; description: string | null; tags: string[]; gifUrl?: string | null };
 type MonthlyData = { month: string; avgRating: number; entryCount: number };
 type YearEntry = { date: string; rating: number };
 type Distribution = { rating: number; count: number };
@@ -75,8 +75,8 @@ type StatsPayload = {
   today: string;
   monthStart: string;
   monthEnd: string;
-  lastEntry: null | { date: string; rating: number; description: string; tags: string[] };
-  todayEntry: null | { date: string; rating: number; description: string; tags: string[] };
+  lastEntry: null | { date: string; rating: number; description: string; tags: string[]; gifUrl?: string | null };
+  todayEntry: null | { date: string; rating: number; description: string; tags: string[]; gifUrl?: string | null };
   participationCount: number;
   currentMonthAvg: number | null;
   monthEntries: MonthEntry[];
@@ -148,6 +148,7 @@ type DailyEntry = {
   username: string;
   rating: number;
   tags: string[];
+  gifUrl?: string | null;
 };
 
 // State
@@ -802,6 +803,7 @@ function getBadgeName(key: string): string {
                         <span class="tooltip-rating">{{ getEntryForDay(d)?.rating }}/20</span>
                       </div>
                       <div v-if="getEntryForDay(d)?.description" class="tooltip-comment">"{{ getEntryForDay(d)?.description }}"</div>
+                      <img v-if="getEntryForDay(d)?.gifUrl" :src="getEntryForDay(d)!.gifUrl!" alt="GIF" class="tooltip-gif" />
                       <div v-if="getEntryForDay(d)?.tags?.length" class="tooltip-tags">
                         <span v-for="tag in getEntryForDay(d)?.tags" :key="tag" class="tooltip-tag">{{ getTagDisplay(tag).icon }}</span>
                       </div>
@@ -1593,6 +1595,14 @@ function getBadgeName(key: string): string {
   line-height: 1.4;
   margin-bottom: 10px;
   word-break: break-word;
+}
+
+.tooltip-gif {
+  max-width: 100%;
+  max-height: 80px;
+  border-radius: 6px;
+  object-fit: contain;
+  margin-bottom: 8px;
 }
 
 .tooltip-tags {

@@ -27,8 +27,8 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
   // Add entry
   router.post("/entries", authenticateToken, async (req, res, next) => {
     try {
-      const { rating, description, tags } = req.body;
-      const result = await entryService.saveEntry({ userId: req.user.id, rating, description, tags });
+      const { rating, description, tags, gifUrl } = req.body;
+      const result = await entryService.saveEntry({ userId: req.user.id, rating, description, tags, gifUrl });
       res.json({ message: "Saved", newBadges: result.newBadges || [] });
     } catch (err) {
       next(err);
@@ -51,6 +51,7 @@ export function createEntriesRoutes({ entryService, authenticateToken }) {
         date: result.date,
         description: result.description,
         tags: result.tags || [],
+        gifUrl: result.gifUrl || null,
         // NOTE: username and rating intentionally NOT included - it's a guessing game!
       });
     } catch (err) {

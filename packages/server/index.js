@@ -47,6 +47,7 @@ import {
   createUsersRoutes,
   createBotRoutes,
   createAiRoutes,
+  createGiphyRoutes,
 } from "./interfaces/index.js";
 
 // Path helpers
@@ -113,6 +114,7 @@ app.use("/api", createStatsRoutes({ statsService, authenticateToken }));
 app.use("/api", createUsersRoutes({ statsService, authenticateToken }));
 app.use("/api", createBotRoutes({ statsService, authenticateBot, logger: logBot }));
 app.use("/api", createAiRoutes({ config, authenticateToken, logger: logAPI }));
+app.use("/api", createGiphyRoutes({ config, authenticateToken }));
 
 // Error handling middleware (must be last)
 app.use(errorMiddleware);

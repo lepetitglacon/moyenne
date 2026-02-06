@@ -4,13 +4,14 @@ import { useRouter } from "vue-router";
 import AppShell from "../components/AppShell.vue";
 import NavMenu from "../components/NavMenu.vue";
 import TagSelector from "../components/TagSelector.vue";
+import GifPicker from "../components/GifPicker.vue";
 import { useFlow } from "../composables/useFlow";
 import { useAuth } from "../composables/useAuth";
 
 const router = useRouter();
 const { authFetch } = useAuth();
 
-const { dayScore, dayComment } = useFlow();
+const { dayScore, dayComment, dayGifUrl } = useFlow();
 
 const error = ref<string | null>(null);
 const saving = ref(false);
@@ -127,6 +128,7 @@ onMounted(async () => {
         dayScore.value = data.rating || 0;
         dayComment.value = data.description || "";
         selectedTags.value = data.tags || [];
+        dayGifUrl.value = data.gifUrl || null;
       }
     }
   } catch {
@@ -155,6 +157,7 @@ async function next() {
         rating: dayScore.value,
         description: dayComment.value.trim(),
         tags: selectedTags.value,
+        gifUrl: dayGifUrl.value || null,
       }),
     });
 
@@ -285,6 +288,8 @@ async function improveComment() {
             placeholder="Ecris un commentaire..."
             @input="error = null"
           />
+
+          <GifPicker v-model="dayGifUrl" />
 
           <div class="improve-section">
             <div class="creativity-selector">
