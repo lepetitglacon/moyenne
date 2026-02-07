@@ -8,15 +8,15 @@ import { API_BASE_URL } from "../api";
 const router = useRouter();
 const { loginWithToken } = useAuth();
 
-const email = ref("");
+const username = ref("");
 const password = ref("");
+const registerEmail = ref("");
+const isRegisterMode = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-const canSubmit = computed(() => email.value.trim().length > 0 && password.value.trim().length > 0);
+const canSubmit = computed(() => username.value.trim().length > 0 && password.value.trim().length > 0);
 
-// Ton backend attend username/password.
-// Ici on envoie email dans username (simple).
 async function onLogin() {
   error.value = null;
 
@@ -31,7 +31,7 @@ async function onLogin() {
     const res = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: email.value.trim(), password: password.value }),
+      body: JSON.stringify({ username: username.value.trim(), password: password.value }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -61,14 +61,27 @@ async function onRegister() {
     return;
   }
 
+  if (!isRegisterMode.value) {
+    isRegisterMode.value = true;
+    return;
+  }
+
   loading.value = true;
 
   try {
     // 1) création du compte
+    const registerBody: Record<string, string> = {
+      username: username.value.trim(),
+      password: password.value,
+    };
+    if (registerEmail.value.trim()) {
+      registerBody.email = registerEmail.value.trim();
+    }
+
     const res = await fetch(`${API_BASE_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: email.value.trim(), password: password.value }),
+      body: JSON.stringify(registerBody),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -95,7 +108,7 @@ async function onRegister() {
         <label class="field">
           <span class="field-label">Pseudo :</span>
           <input
-            v-model="email"
+            v-model="username"
             class="field-input"
             type="text"
             placeholder="Pupute"
@@ -118,15 +131,31 @@ async function onRegister() {
           />
         </label>
 
-        <button class="btn btn-primary" type="submit" :disabled="loading">
+        <label v-if="isRegisterMode" class="field">
+          <span class="field-label">Email (pour récupérer ton mot de passe) :</span>
+          <input
+            v-model="registerEmail"
+            class="field-input"
+            type="email"
+            placeholder="ton@email.com"
+            autocomplete="email"
+            @input="error = null"
+          />
+        </label>
+
+        <button v-if="!isRegisterMode" class="btn btn-primary" type="submit" :disabled="loading">
           {{ loading ? "CONNEXION..." : "CONTINUER" }}
         </button>
 
         <button class="btn btn-secondary" type="button" :disabled="loading" @click="onRegister">
-          {{ loading ? "..." : "CRÉER UN PROFIL" }}
+          {{ loading ? "..." : isRegisterMode ? "VALIDER L'INSCRIPTION" : "CRÉER UN PROFIL" }}
         </button>
 
-        <a class="link-muted" href="#" @click.prevent>Mot de passe oublié</a>
+        <a v-if="isRegisterMode" class="link-muted" href="#" @click.prevent="isRegisterMode = false">
+          Retour à la connexion
+        </a>
+
+        <a class="link-muted" href="#" @click.prevent="router.push({ name: 'forgotPassword' })">Mot de passe oublié</a>
 
         <p v-if="error" class="form-error">{{ error }}</p>
 

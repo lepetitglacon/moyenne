@@ -8,3 +8,4 @@ export { createRatingRepository } from "./rating.repository.js";
 export { createAssignmentRepository } from "./assignment.repository.js";
 export { createBadgeRepository } from "./badge.repository.js";
 export { createGuessRepository } from "./guess.repository.js";
+export { createPasswordResetRepository } from "./password-reset.repository.js";

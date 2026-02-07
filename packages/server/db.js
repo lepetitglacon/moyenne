@@ -2,6 +2,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import bcrypt from "bcryptjs";
 import { Logger } from "./logger.js";
+import { runMigrations } from "./migrate.js";
 
 const dbLogger = new Logger("DB");
 
@@ -192,16 +193,7 @@ async function initDb() {
     // MIGRATIONS
     // ═══════════════════════════════════════════════════════════════
     dbLogger.info("Running migrations...");
-
-    // Migration: Add tags column to entries
-    const tagsColumnCheck = await pool.query(`
-      SELECT 1 FROM information_schema.columns
-      WHERE table_name = 'entries' AND column_name = 'tags'
-    `);
-    if (tagsColumnCheck.rows.length === 0) {
-      await pool.query(`ALTER TABLE entries ADD COLUMN tags JSONB DEFAULT '[]'`);
-      dbLogger.info("Migration: Added tags column to entries");
-    }
+    await runMigrations(pool, dbLogger);
 
     // ═══════════════════════════════════════════════════════════════
     // INDEXES

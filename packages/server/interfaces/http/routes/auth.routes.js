@@ -29,8 +29,8 @@ export function createAuthRoutes({ authService }) {
   // Register
   router.post("/register", async (req, res, next) => {
     try {
-      const { username, password } = req.body;
-      await authService.register({ username, password });
+      const { username, password, email } = req.body;
+      await authService.register({ username, password, email });
       res.json({ message: "User created" });
     } catch (err) {
       next(err);
@@ -43,6 +43,29 @@ export function createAuthRoutes({ authService }) {
       const { refreshToken } = req.body;
       const result = await authService.refreshToken({ refreshToken });
       res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Forgot password
+  router.post("/forgot-password", async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      await authService.requestPasswordReset({ email });
+      // Always return success to not reveal if email exists
+      res.json({ message: "Si cet email existe, un lien de réinitialisation a été envoyé" });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Reset password with token
+  router.post("/reset-password", async (req, res, next) => {
+    try {
+      const { token, newPassword } = req.body;
+      await authService.resetPassword({ token, newPassword });
+      res.json({ message: "Mot de passe réinitialisé avec succès" });
     } catch (err) {
       next(err);
     }

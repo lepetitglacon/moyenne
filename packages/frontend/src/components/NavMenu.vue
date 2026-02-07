@@ -47,6 +47,14 @@ function handleLogout() {
       Classement
     </button>
     <button
+      class="nav-item"
+      :class="{ active: isActive('compte') }"
+      type="button"
+      @click="go('compte')"
+    >
+      Compte
+    </button>
+    <button
       class="nav-item nav-item--logout"
       type="button"
       @click="handleLogout"

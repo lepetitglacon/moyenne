@@ -46,6 +46,41 @@ export function validateCredentials(credentials) {
 }
 
 /**
+ * Validate a password (min 6 chars)
+ * @param {string} password
+ * @returns {ValidationResult}
+ */
+export function validatePassword(password) {
+  if (!password || typeof password !== "string" || password.trim() === "") {
+    return { valid: false, error: "Le mot de passe est requis" };
+  }
+
+  if (password.length < 6) {
+    return { valid: false, error: "Le mot de passe doit contenir au moins 6 caractères" };
+  }
+
+  return { valid: true, error: null };
+}
+
+/**
+ * Validate an email address (basic format check)
+ * @param {string} email
+ * @returns {ValidationResult}
+ */
+export function validateEmail(email) {
+  if (!email || typeof email !== "string" || email.trim() === "") {
+    return { valid: false, error: "L'email est requis" };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    return { valid: false, error: "Format d'email invalide" };
+  }
+
+  return { valid: true, error: null };
+}
+
+/**
  * Validate a user ID
  * @param {number|string} userId
  * @returns {ValidationResult}

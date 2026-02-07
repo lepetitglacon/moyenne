@@ -39,6 +39,10 @@ const config = {
   langfuseSecretKey: optionalEnv("LANGFUSE_SECRET_KEY", ""),
   langfusePublicKey: optionalEnv("LANGFUSE_PUBLIC_KEY", ""),
   langfuseBaseUrl: optionalEnv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
+
+  // Resend (optional - for password reset emails)
+  resendApiKey: optionalEnv("RESEND_API_KEY", ""),
+  emailFrom: optionalEnv("EMAIL_FROM", "noreply@pierrederache.fr"),
 };
 
 export default config;

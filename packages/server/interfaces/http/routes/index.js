@@ -9,3 +9,4 @@ export { createUsersRoutes } from "./users.routes.js";
 export { createBotRoutes } from "./bot.routes.js";
 export { createAiRoutes } from "./ai.routes.js";
 export { createGiphyRoutes } from "./giphy.routes.js";
+export { createAccountRoutes } from "./account.routes.js";

@@ -18,4 +18,6 @@ export {
 export {
   validateCredentials,
   validateUserId,
+  validatePassword,
+  validateEmail,
 } from "./user.validator.js";

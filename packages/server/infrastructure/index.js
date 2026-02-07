@@ -3,3 +3,4 @@
  */
 
 export * from "./repositories/index.js";
+export { createEmailService } from "./email.service.js";

@@ -4,9 +4,10 @@
  */
 
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { validateCredentials } from "../domain/index.js";
-import { ValidationError, AuthError, ConflictError } from "../shared/errors.js";
+import { validateCredentials, validatePassword, validateEmail } from "../domain/index.js";
+import { ValidationError, AuthError, ConflictError, NotFoundError } from "../shared/errors.js";
 
 /**
  * @typedef {Object} AuthDependencies
@@ -31,16 +32,16 @@ import { ValidationError, AuthError, ConflictError } from "../shared/errors.js";
  * Create auth service instance
  * @param {AuthDependencies} deps
  */
-export function createAuthService({ userRepo, config, logger }) {
+export function createAuthService({ userRepo, passwordResetRepo, emailService, config, logger }) {
   return {
     /**
      * Register a new user
-     * @param {{ username: string, password: string }} credentials
+     * @param {{ username: string, password: string, email?: string }} credentials
      * @returns {Promise<RegisterResult>}
      * @throws {ValidationError} If credentials are invalid
      * @throws {ConflictError} If username already taken
      */
-    async register({ username, password }) {
+    async register({ username, password, email }) {
       // Validate input
       const validation = validateCredentials({ username, password });
       if (!validation.valid) {
@@ -52,9 +53,22 @@ export function createAuthService({ userRepo, config, logger }) {
         throw new ConflictError("Username already taken");
       }
 
+      // Validate email if provided
+      if (email) {
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.valid) {
+          throw new ValidationError(emailValidation.error);
+        }
+      }
+
       // Hash password and create user
       const passwordHash = bcrypt.hashSync(password, 10);
       const result = await userRepo.create(username, passwordHash);
+
+      // Update email if provided
+      if (email) {
+        await userRepo.updateEmail(result.lastInsertRowid, email.trim());
+      }
 
       logger?.info("Nouvel utilisateur créé", { username });
 
@@ -170,6 +184,124 @@ export function createAuthService({ userRepo, config, logger }) {
         logger?.debug("Refresh token invalide", { error: err.message });
         throw new AuthError("Invalid or expired refresh token");
       }
+    },
+
+    /**
+     * Get user profile (id, username, email)
+     * @param {number} userId
+     */
+    async getProfile(userId) {
+      const user = await userRepo.findByIdWithPassword(userId);
+      if (!user) {
+        throw new NotFoundError("Utilisateur non trouvé");
+      }
+      return { id: user.id, username: user.username, email: user.email || null };
+    },
+
+    /**
+     * Change password for authenticated user
+     * @param {{ userId: number, currentPassword: string, newPassword: string }} params
+     */
+    async changePassword({ userId, currentPassword, newPassword }) {
+      // Validate new password
+      const validation = validatePassword(newPassword);
+      if (!validation.valid) {
+        throw new ValidationError(validation.error);
+      }
+
+      // Get user with password hash
+      const user = await userRepo.findByIdWithPassword(userId);
+      if (!user) {
+        throw new NotFoundError("Utilisateur non trouvé");
+      }
+
+      // Verify current password
+      if (!bcrypt.compareSync(currentPassword, user.password)) {
+        throw new AuthError("Mot de passe actuel incorrect");
+      }
+
+      // Hash and update
+      const passwordHash = bcrypt.hashSync(newPassword, 10);
+      await userRepo.updatePassword(userId, passwordHash);
+
+      logger?.info("Mot de passe changé", { userId });
+    },
+
+    /**
+     * Request a password reset (sends email)
+     * @param {{ email: string }} params
+     */
+    async requestPasswordReset({ email }) {
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        throw new ValidationError(emailValidation.error);
+      }
+
+      const user = await userRepo.findByEmail(email.trim());
+      if (!user) {
+        // Don't reveal whether the email exists
+        logger?.debug("Reset demandé pour email inconnu", { email });
+        return;
+      }
+
+      // Generate token
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await passwordResetRepo.create(user.id, token, expiresAt);
+
+      // Send email
+      const resetUrl = `${config.frontendUrl}/reset-password?token=${token}`;
+      const sent = await emailService?.sendPasswordReset({ to: email.trim(), resetUrl });
+
+      if (sent) {
+        logger?.info("Email de reset envoyé", { userId: user.id });
+      }
+    },
+
+    /**
+     * Reset password using a token
+     * @param {{ token: string, newPassword: string }} params
+     */
+    async resetPassword({ token, newPassword }) {
+      const validation = validatePassword(newPassword);
+      if (!validation.valid) {
+        throw new ValidationError(validation.error);
+      }
+
+      const resetToken = await passwordResetRepo.findValidToken(token);
+      if (!resetToken) {
+        throw new AuthError("Token invalide ou expiré");
+      }
+
+      // Hash and update password
+      const passwordHash = bcrypt.hashSync(newPassword, 10);
+      await userRepo.updatePassword(resetToken.user_id, passwordHash);
+
+      // Mark token as used
+      await passwordResetRepo.markUsed(resetToken.id);
+
+      logger?.info("Mot de passe réinitialisé via token", { userId: resetToken.user_id });
+    },
+
+    /**
+     * Update user email
+     * @param {{ userId: number, email: string }} params
+     */
+    async updateEmail({ userId, email }) {
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        throw new ValidationError(emailValidation.error);
+      }
+
+      // Check if email is already taken by another user
+      const existing = await userRepo.findByEmail(email.trim());
+      if (existing && existing.id !== userId) {
+        throw new ConflictError("Cet email est déjà utilisé");
+      }
+
+      await userRepo.updateEmail(userId, email.trim());
+      logger?.info("Email mis à jour", { userId });
     },
   };
 }

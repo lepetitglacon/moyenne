@@ -26,6 +26,8 @@ import {
   createAssignmentRepository,
   createBadgeRepository,
   createGuessRepository,
+  createPasswordResetRepository,
+  createEmailService,
 } from "./infrastructure/index.js";
 
 // Application
@@ -48,6 +50,7 @@ import {
   createBotRoutes,
   createAiRoutes,
   createGiphyRoutes,
+  createAccountRoutes,
 } from "./interfaces/index.js";
 
 // Path helpers
@@ -61,6 +64,10 @@ const ratingRepo = createRatingRepository(pool);
 const assignmentRepo = createAssignmentRepository(pool);
 const badgeRepo = createBadgeRepository(pool);
 const guessRepo = createGuessRepository(pool);
+const passwordResetRepo = createPasswordResetRepository(pool);
+
+// Initialize email service
+const emailService = createEmailService({ config, logger: new Logger("Email") });
 
 // Initialize loggers
 const logAuth = new Logger("Auth");
@@ -68,7 +75,7 @@ const logAPI = new Logger("API");
 const logBot = new Logger("Bot");
 
 // Initialize services
-const authService = createAuthService({ userRepo, config, logger: logAuth });
+const authService = createAuthService({ userRepo, passwordResetRepo, emailService, config, logger: logAuth });
 const badgeService = createBadgeService({ badgeRepo, entryRepo, ratingRepo, guessRepo, logger: logAPI });
 const entryService = createEntryService({ entryRepo, ratingRepo, assignmentRepo, guessRepo, badgeService, logger: logAPI });
 const statsService = createStatsService({ userRepo, entryRepo, ratingRepo, guessRepo, badgeService, logger: logBot });
@@ -115,6 +122,7 @@ app.use("/api", createUsersRoutes({ statsService, authenticateToken }));
 app.use("/api", createBotRoutes({ statsService, authenticateBot, logger: logBot }));
 app.use("/api", createAiRoutes({ config, authenticateToken, logger: logAPI }));
 app.use("/api", createGiphyRoutes({ config, authenticateToken }));
+app.use("/api", createAccountRoutes({ authService, authenticateToken }));
 
 // Error handling middleware (must be last)
 app.use(errorMiddleware);

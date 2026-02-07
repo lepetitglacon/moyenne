@@ -92,5 +92,55 @@ export function createUserRepository(pool) {
       );
       return result.rows;
     },
+
+    /**
+     * Update user password hash
+     * @param {number} userId
+     * @param {string} passwordHash
+     */
+    async updatePassword(userId, passwordHash) {
+      await pool.query(
+        "UPDATE users SET password = $1 WHERE id = $2",
+        [passwordHash, userId]
+      );
+    },
+
+    /**
+     * Update user email
+     * @param {number} userId
+     * @param {string} email
+     */
+    async updateEmail(userId, email) {
+      await pool.query(
+        "UPDATE users SET email = $1 WHERE id = $2",
+        [email, userId]
+      );
+    },
+
+    /**
+     * Find user by email
+     * @param {string} email
+     * @returns {Promise<User|undefined>}
+     */
+    async findByEmail(email) {
+      const result = await pool.query(
+        "SELECT id, username, email FROM users WHERE email = $1",
+        [email]
+      );
+      return result.rows[0];
+    },
+
+    /**
+     * Find user by ID with password hash
+     * @param {number} id
+     * @returns {Promise<User|undefined>}
+     */
+    async findByIdWithPassword(id) {
+      const result = await pool.query(
+        "SELECT id, username, email, password FROM users WHERE id = $1",
+        [id]
+      );
+      return result.rows[0];
+    },
   };
 }
