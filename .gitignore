@@ -23,6 +23,8 @@ data/
 *.sql
 *.sql.gz
 backups/
+# But keep migration files
+!packages/server/migrations/*.sql
 
 # =============================================================================
 # Build & Output
